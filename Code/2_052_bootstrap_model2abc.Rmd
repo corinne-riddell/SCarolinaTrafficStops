@@ -1,0 +1,176 @@
+```{r}
+library(tidyverse)
+library(lubridate)
+library(broom)
+library(glue)
+library(patchwork)
+library(knitr)
+library(splines) #for the ns() function to make a restricted cubic spline
+library(magrittr)
+library(tibble)
+library(modelr)
+library(boot)
+library(beepr)
+library(here)
+source(here("Code", "99_helper-functions.R"))
+
+load(here("Data", "Enhanced-data-05-06.Rdata")) # this loads SC_05_06 into the environment
+
+# Apply exclusion criteria (highway patrol only, and race constraints)
+SC_after_exclusions <- SC_05_06 %>% 
+  filter(police_department == "SCHP", 
+         driver_race %in% c("Black", "Hispanic", "White"))
+
+# Add variables needed for the analysis 
+SC_after_exclusions <- SC_after_exclusions %>% 
+  mutate(dangerous_days = case_when(day == 31 & month == 12 ~ "New Year's",
+                                    day == 1 & month == 1 ~ "New Year's",
+                                    day == 4 & month == 7 ~ "Independence day",
+                                    day == 18 & month == 3 ~ "Day after St. Patrick's",
+                                    day %in% c(24, 25, 26) & month == 11 & year == 2005 ~ "Thanksgiving weekend", # Thanksgiving Thurs + Friday + Saturday
+                                    day %in% c(23, 24, 25) & month == 11 & year == 2006 ~ "Thanksgiving weekend",
+                                    day %in% c(22, 23, 24) & month == 11 & year == 2007 ~ "Thanksgiving weekend", 
+                                    day %in% c(28, 29, 30) & month == 11 & year == 2008 ~ "Thanksgiving weekend",
+                                    day %in% c(26, 27, 28) & month == 11 & year == 2009 ~ "Thanksgiving weekend", 
+                                    day %in% c(25, 26, 27) & month == 11 & year == 2010 ~ "Thanksgiving weekend",
+                                    day %in% c(24, 25, 26) & month == 11 & year == 2011 ~ "Thanksgiving weekend", 
+                                    day %in% c(22, 23, 24) & month == 11 & year == 2012 ~ "Thanksgiving weekend",
+                                    day %in% c(2,3,4,5) & month == 9 & year == 2005 ~ "Labor Day weekend", # Monday + preceding Friday, Saturday, Sunday
+                                    day %in% c(1,2,3,4) & month == 9 & year == 2006 ~ "Labor Day weekend",
+                                    day %in% c(1,2,3) & month == 9 & year == 2007 ~ "Labor Day weekend",
+                                    day == 31 & month == 8 & year == 2007 ~ "Labor Day weekend",
+                                    day == 1 & month == 9 & year == 2008 ~ "Labor Day weekend",
+                                    day %in% c(29, 30, 31) & month == 8 & year == 2008 ~ "Labor Day weekend",
+                                    day %in% c(4,5,6,7) & month == 9 & year == 2009 ~ "Labor Day weekend",
+                                    day %in% c(3,4,5,6) & month == 9 & year == 2010 ~ "Labor Day weekend",
+                                    day %in% c(2,3,4,5) & month == 9 & year == 2011 ~ "Labor Day weekend",
+                                    day %in% c(1,2,3) & month == 9 & year == 2012 ~ "Labor Day weekend",
+                                    day == 31 & month == 8 & year == 2012 ~ "Labor Day weekend")
+  ) %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0))
+
+#table(SC_after_exclusions$dangerous_days, useNA = "always")
+SC_after_exclusions$dangerous_days[is.na(SC_after_exclusions$dangerous_days) == T] <- "Other day"
+SC_after_exclusions$dangerous_days <- fct_relevel(SC_after_exclusions$dangerous_days, "Other day")
+#levels(SC_after_exclusions$dangerous_days)
+#table(SC_after_exclusions$dangerous_days, useNA = "always")
+
+# add variables needed for the analysis of arrest and search rates
+SC_for_analysis <- SC_after_exclusions %>%
+  mutate(arrest = case_when(stop_outcome %in% c("Arrest", "Felony Arrest") ~ 1,
+                            stop_outcome %in% c("Citation", "Warning") ~ 0),
+         felony_arrest = 1 * (stop_outcome == "Felony Arrest") + 0 * (stop_outcome != "Felony Arrest"),
+         regular_arrest = 1 * (stop_outcome == "Arrest") + 0 * (stop_outcome != "Arrest"),
+         race = forcats::fct_relevel(driver_race, "White", "Black", "Hispanic"), 
+         day_of_week = forcats::fct_relevel(day_of_week, "Sunday"),
+         driver_gender = forcats::fct_relevel(driver_gender, "F"),
+         month_i = factor(month))
+
+#Add a second variable for dangerous days that leaves out independence day
+SC_for_analysis$dang_days2 <- SC_for_analysis$dangerous_days 
+SC_for_analysis$dang_days2[SC_for_analysis$dang_days2 == "Independence day"] <- "Other day"
+#table(SC_for_analysis$dang_days2, SC_for_analysis$dangerous_days)
+```
+
+```{r model2b}
+#bootstrap model 2b
+#5hr
+
+set.seed(123)
+
+SC_for_analysis_VO <- SC_for_analysis %>%
+  filter(! is.na(driver_age)) %>%
+  filter(stop_purpose == "Violation Observed")
+
+system.time(results_2b <- boot(data = SC_for_analysis_VO,
+                   statistic = bs_logistic, R = 1000,
+                   formula = arrest ~ race + driver_gender +
+                     ns(driver_age, knots = c(20, 30, 40, 50, 60)) +
+                     post_policy + race * post_policy + month_i +
+                     day_of_week + dangerous_days,
+                   parallel = "multicore", ncpus = 8))
+
+save(results_2b, file = here::here("Data", "bootstrap_model2b_result.Rdata"))
+
+results_2b$t0[10]
+boot.ci(results_2b, type="perc", index = 10) # additional RR black
+
+results_2b$t0[11]
+boot.ci(results_2b, type="perc", index = 11) # additional RR hispanic
+```
+
+```{r model2c}
+#bootstrap model 2c
+#5236 seconds = 1.5 hours
+
+set.seed(123)
+
+SC_for_analysis_RT <- SC_for_analysis %>%
+  filter(! is.na(driver_age)) %>%
+  filter(stop_purpose == "Radar Triggered")
+
+system.time(results_2c <- boot(data = SC_for_analysis_RT,
+                   statistic = bs_logistic, R = 1000,
+                   formula = arrest ~ race + driver_gender +
+                     ns(driver_age, knots = c(20, 30, 40, 50, 60)) +
+                     post_policy + race*post_policy + month_i +
+                     day_of_week + dang_days2,
+                   parallel = "multicore", ncpus = 8))
+
+save(results_2c, file = here("Data", "bootstrap_model2c_result.Rdata"))
+
+results_2c$t0[10]
+boot.ci(results_2c, type="perc", index = 10) # additional RR black
+
+results_2c$t0[11]
+boot.ci(results_2c, type="perc", index = 11) # additional RR hispanic
+```
+
+```{r model3b}
+#bootstrap model 3b
+# < 5hr
+set.seed(123)
+
+system.time(results_3b <- boot(data = SC_for_analysis_VO,
+                   statistic = bs_logistic, R = 1000,
+                   formula = search_conducted ~ race + driver_gender +
+                     ns(driver_age, knots = c(20, 30, 40, 50, 60)) +
+                     post_policy + race * post_policy + month_i +
+                     day_of_week + dangerous_days,
+                   parallel = "multicore", ncpus = 8))
+
+save(results_3b, file = here::here("Data", "bootstrap_model3b_result.Rdata"))
+
+results_3b$t0[10]
+boot.ci(results_3b, type="perc", index = 10) # additional RR black
+
+results_3b$t0[11]
+boot.ci(results_3b, type="perc", index = 11) # additional RR hispanic
+```
+
+```{r model3c}
+#bootstrap model 3c
+#1.7 hr
+
+set.seed(123)
+
+
+system.time(results_3c <- boot(data = SC_for_analysis_RT,
+                   statistic = bs_logistic, R = 1000,
+                   formula = search_conducted ~ race + driver_gender +
+                     ns(driver_age, knots = c(20, 30, 40, 50, 60)) +
+                     post_policy + race*post_policy + month_i +
+                     day_of_week + dang_days2,
+                   parallel = "multicore", ncpus = 8))
+
+save(results_3c, file = here("Data", "bootstrap_model3c_result.Rdata"))
+
+results_3c$t0[10]
+boot.ci(results_3c, type="perc", index = 10) # additional RR black
+
+results_3c$t0[11]
+boot.ci(results_3c, type="perc", index = 11) # additional RR hispanic
+```

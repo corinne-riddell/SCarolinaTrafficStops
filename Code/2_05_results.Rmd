@@ -1,0 +1,872 @@
+---
+title: "Untitled"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Results
+
+```{r load-bootstrapped-findings, echo=F}
+# WARNING: THESE FOUR FILES ARE LOADED INTO MEMORY BECAUSE EACH BOOSTRAP TAKES
+# SEVERAL HOURS TO RUN. THESE RESULTS DO NOT UPDATE INTERACTIVELY WHEN YOU
+# RE-KNIT THE FILE.
+# PLEASE SEE: Code/2_052_bootstrap_model2abc.Rmd FOR THE CODE THAT GENERATES
+# THESE FILES. THAT FILE IS SELF-CONTAINED.
+
+load(here("Data", "bootstrap_model2b_result.Rdata"))
+load(here("Data", "bootstrap_model2c_result.Rdata"))
+load(here("Data", "bootstrap_model3b_result.Rdata"))
+load(here("Data", "bootstrap_model3c_result.Rdata"))
+```
+
+```{r load-2005-2006-traffic-stops, echo=F}
+load(here("Data", "Enhanced-data-05-06.Rdata")) # this loads SC_05_06 into the environment
+
+# Apply exclusion criteria (highway patrol only, race constraints, either radar triggered or violation observed)
+SC_after_exclusions <- SC_05_06 %>% 
+  filter(police_department == "SCHP", 
+         driver_race %in% c("Black", "Hispanic", "White")) %>% 
+  filter(stop_purpose %in% c("Radar Triggered", "Violation Observed"))
+
+# Add variables needed for the analysis 
+SC_after_exclusions <- SC_after_exclusions %>% 
+  mutate(dangerous_days = case_when(day == 31 & month == 12 ~ "New Year's",
+                                    day == 1 & month == 1 ~ "New Year's",
+                                    day == 4 & month == 7 ~ "Independence day",
+                                    day == 18 & month == 3 ~ "Day after St. Patrick's",
+                                    day %in% c(24, 25, 26) & month == 11 & year == 2005 ~ "Thanksgiving weekend", # Thanksgiving Thurs + Friday + Saturday
+                                    day %in% c(23, 24, 25) & month == 11 & year == 2006 ~ "Thanksgiving weekend",
+                                    day %in% c(22, 23, 24) & month == 11 & year == 2007 ~ "Thanksgiving weekend", 
+                                    day %in% c(28, 29, 30) & month == 11 & year == 2008 ~ "Thanksgiving weekend",
+                                    day %in% c(26, 27, 28) & month == 11 & year == 2009 ~ "Thanksgiving weekend", 
+                                    day %in% c(25, 26, 27) & month == 11 & year == 2010 ~ "Thanksgiving weekend",
+                                    day %in% c(24, 25, 26) & month == 11 & year == 2011 ~ "Thanksgiving weekend", 
+                                    day %in% c(22, 23, 24) & month == 11 & year == 2012 ~ "Thanksgiving weekend",
+                                    day %in% c(2,3,4,5) & month == 9 & year == 2005 ~ "Labor Day weekend", # Monday + preceding Friday, Saturday, Sunday
+                                    day %in% c(1,2,3,4) & month == 9 & year == 2006 ~ "Labor Day weekend",
+                                    day %in% c(1,2,3) & month == 9 & year == 2007 ~ "Labor Day weekend",
+                                    day == 31 & month == 8 & year == 2007 ~ "Labor Day weekend",
+                                    day == 1 & month == 9 & year == 2008 ~ "Labor Day weekend",
+                                    day %in% c(29, 30, 31) & month == 8 & year == 2008 ~ "Labor Day weekend",
+                                    day %in% c(4,5,6,7) & month == 9 & year == 2009 ~ "Labor Day weekend",
+                                    day %in% c(3,4,5,6) & month == 9 & year == 2010 ~ "Labor Day weekend",
+                                    day %in% c(2,3,4,5) & month == 9 & year == 2011 ~ "Labor Day weekend",
+                                    day %in% c(1,2,3) & month == 9 & year == 2012 ~ "Labor Day weekend",
+                                    day == 31 & month == 8 & year == 2012 ~ "Labor Day weekend")
+  ) %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0))
+
+#table(SC_after_exclusions$dangerous_days, useNA = "always")
+SC_after_exclusions$dangerous_days[is.na(SC_after_exclusions$dangerous_days) == T] <- "Other day"
+SC_after_exclusions$dangerous_days <- fct_relevel(SC_after_exclusions$dangerous_days, "Other day")
+#levels(SC_after_exclusions$dangerous_days)
+#table(SC_after_exclusions$dangerous_days, useNA = "always")
+
+# add variables needed for the analysis of arrest and search rates
+SC_for_analysis <- SC_after_exclusions %>%
+  mutate(arrest = case_when(stop_outcome %in% c("Arrest", "Felony Arrest") ~ 1,
+                            stop_outcome %in% c("Citation", "Warning") ~ 0),
+         felony_arrest = 1 * (stop_outcome == "Felony Arrest") + 0 * (stop_outcome != "Felony Arrest"),
+         regular_arrest = 1 * (stop_outcome == "Arrest") + 0 * (stop_outcome != "Arrest"),
+         race = forcats::fct_relevel(driver_race, "White", "Black", "Hispanic"), 
+         day_of_week = forcats::fct_relevel(day_of_week, "Sunday"),
+         driver_gender = forcats::fct_relevel(driver_gender, "F"),
+         month_i = factor(month))
+
+#Add a second variable for dangerous days that leaves out independence day
+SC_for_analysis$dang_days2 <- SC_for_analysis$dangerous_days 
+SC_for_analysis$dang_days2[SC_for_analysis$dang_days2 == "Independence day"] <- "Other day"
+#table(SC_for_analysis$dang_days2, SC_for_analysis$dangerous_days)
+```
+
+```{r statistics-about-exclusions, echo=F}
+
+# exclusion information (police department)
+dept_stats <- SC_05_06 %>% count(police_department) %>% mutate(percent = n/sum(n))
+num_other_depts <- dept_stats %>% filter(!(police_department == 'SCHP')) %>% tally(wt = n) #number of stops from other departments
+percent_other_depts <- dept_stats %>% filter(!(police_department == 'SCHP')) %>% summarise(percent = sum(percent)) # percent of stops to other departments
+
+#exclusion information (race)
+race_stats <- SC_05_06 %>% count(driver_race) %>% mutate(percent = n/sum(n))
+num_other_na <- race_stats %>% filter(driver_race %in% c("", "Other")) %>% tally(wt = n)
+percent_other_na <- race_stats %>% filter(driver_race %in% c("", "Other")) %>% summarise(percent = sum(percent))
+
+race_stats_2 <- SC_after_exclusions %>% 
+  count(driver_race) %>% 
+  mutate(percent = round(n/sum(n)*100,2))
+```
+
+```{r statistics-about-daily-num-visits-pre-and-post-policy-change, echo=F}
+
+per_day <- SC_after_exclusions %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0)) %>%
+  group_by(stop_date) %>%
+  summarize(visits_per_day = n(), 
+            post_policy = first(post_policy))
+
+mean_visits <- per_day %>%
+  group_by(post_policy) %>%
+  summarize(mean = mean(visits_per_day))
+
+difference_mean <- mean_visits %>% tidyr::spread(post_policy, mean) %>% mutate(diff = `1`-`0`) %>% select(diff)
+
+baseline_mean <- mean_visits %>% filter(post_policy == 0) %>% select(mean)
+
+per_higher <- round(difference_mean/baseline_mean*100, 1)
+
+num_rt <- SC_after_exclusions %>% count(stop_purpose) %>% mutate(prop = round(n/sum(n)*100, 2)) %>% filter(stop_purpose == "Radar Triggered") %>% select(prop)
+num_vo <- SC_after_exclusions %>% count(stop_purpose) %>% mutate(prop = round(n/sum(n)*100, 2)) %>% filter(stop_purpose == "Violation Observed") %>% select(prop)
+
+
+```
+
+```{r mean-by-day-race, echo=F}
+per_day_by_race <- SC_after_exclusions %>%
+  filter(stop_purpose == "Violation Observed") %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0)) %>%
+  group_by(stop_date, driver_race) %>%
+  summarize(visits_per_day = n(), 
+            post_policy = first(post_policy))
+
+mean_visits_race <- per_day_by_race %>%
+  group_by(post_policy, driver_race) %>%
+  summarize(mean = mean(visits_per_day))
+```
+
+### Descriptive Statistics
+
+There were `r  prettyNum(dim(SC_05_06)[1], big.mark = ",")` traffic stops in 
+South Carolina during 2005-2006 included in the Stanford Open Policing Project dataset. We excluded 
+`r prettyNum(num_other_na, big.mark = ",")` (`r round(percent_other_na*100, 1)`%) 
+of individuals with missing or “other” race/ethnicity and `r prettyNum(num_other_depts, big.mark = ",")` 
+(`r round(percent_other_depts*100, 1)`%) stops conducted by officers from 
+departments other than the highway patrol. This included 
+`r dept_stats %>% filter(police_department == "BPS") %>% select(n) %>% prettyNum(big.mark = ",")` stops 
+conducted by the Bureau of Protective Services, 
+`r dept_stats %>% filter(police_department == "STP") %>% select(n) %>% prettyNum(big.mark = ",")` stops by the
+State Transport Police 
+and `r dept_stats %>% filter(police_department == "") %>% select(n)` stops 
+with missing department information. We also excluded 27,261 (0.3%) stops for 
+purposes other than “Violation observed” or “Radar triggered”. After exclusions, 
+`r  prettyNum(dim(SC_after_exclusions)[1], big.mark = ",")` stops remained. Of 
+stopped drivers, `r race_stats_2 %>% filter(driver_race == "White") %>% select(n) %>% prettyNum(big.mark = ",")` 
+were White, `r race_stats_2 %>% filter(driver_race == "Black") %>% select(n) %>% prettyNum(big.mark = ",")` 
+were Black, and `r race_stats_2 %>% filter(driver_race == "Hispanic") %>% select(n) %>% prettyNum(big.mark = ",")` 
+were Hispanic. Of traffic stops, 
+`r SC_after_exclusions %>% filter(year == 2005) %>% tally() %>% prettyNum(big.mark = ",")` occurred in 2005 
+and `r SC_after_exclusions %>% filter(year == 2006) %>% tally() %>% prettyNum(big.mark = ",")` occurred in 
+2006, illustrating an increase in overall number of traffic stops (**Figure 1**).
+On average, there were `r mean_visits %>% filter(post_policy == 0) %>% select(mean) %>% round() %>% prettyNum(big.mark = ",")` 
+traffic stops per day before the upgrade to primary enforcement and 
+`r mean_visits %>% filter(post_policy == 1) %>% select(mean) %>% round() %>% prettyNum(big.mark = ",")` 
+traffic stops after, for a daily increase of 
+`r difference_mean %>% round()` traffic stops (`r per_higher`% increase). `r Words(num_vo %>% unlist())` percent of stops
+were for observed violations, and `r num_rt %>% round()`% were for speeding.
+
+### Impact on traffic stops
+
+```{r make-dataset-for-Poisson-model, echo=F}
+
+# Create the dataset for the first model
+
+# This dataset contains one row for each "race day"
+# I.e., for each day there is a row of data recording the number of stops to
+# Black drivers, and separate rows for Hispanic, and White drivers.
+
+SC_daily <- SC_after_exclusions %>% 
+  group_by(driver_race, stop_date) %>%
+  summarise(daily_num_stops = n(), 
+            month = first(month), 
+            day = first(day),
+            day_index = first(day_index), 
+            day_of_week = first(day_of_week),
+            fri_sat = first(fri_sat),
+            post_policy = first(post_policy),
+            dangerous_days = first(dangerous_days))
+
+SC_daily$race <- as.factor(SC_daily$driver_race)
+SC_daily$month <- as.factor(SC_daily$month)
+SC_daily$day_of_week <- as.factor(SC_daily$day_of_week)
+
+SC_daily$race <- fct_relevel(SC_daily$race, "White")
+SC_daily$day_of_week <- fct_relevel(SC_daily$day_of_week, "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+SC_daily$dangerous_days <- fct_relevel(SC_daily$dangerous_days, "Other day")
+```
+
+```{r model1-outcome-number-of-stops, echo=F}
+model1 <- glm(formula = daily_num_stops ~ race + post_policy + race * post_policy + 
+                month + day_of_week + dangerous_days, 
+              data = SC_daily, family = "quasipoisson")
+
+model1_results <- tidy(model1)
+model1_results <- model1_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI <- as_tibble(exp(confint.default(model1)), rownames = "term")# tidy(exp(confint.default(model1)))
+names(CI) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CI <- as_tibble(exp(confint.default(model1)), rownames = "term")CIs into one data frame
+model1_results <- full_join(model1_results, CI, by = "term")
+
+model1_results %<>% mutate(model = "All stops")
+
+# save the results to be recalled in the paragraph below
+est_Black <- model1_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black <- model1_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black <- model1_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic <- model1_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic <- model1_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic <- model1_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+```
+
+```{r add-predictions, echo=F}
+SC_daily %<>% add_predictions(model1, type = "response") %>%
+  dplyr::rename(model1_predictions = pred)
+```
+
+```{r alternative-model-1-only-for-stops-with-observed-violation, echo=F}
+# Only including stops for a observed violation 
+# Excludes stops for triggering the radar (i.e., speeding)
+
+SC_daily_violations <- SC_after_exclusions %>% 
+  filter(stop_purpose == "Violation Observed") %>% 
+  group_by(driver_race, stop_date) %>%
+  summarise(daily_num_stops = n(), 
+            month = first(month), 
+            day = first(day),
+            day_index = first(day_index), 
+            day_of_week = first(day_of_week),
+            fri_sat = first(fri_sat),
+            post_policy = first(post_policy),
+            dangerous_days = first(dangerous_days))
+
+SC_daily_violations$race <- as.factor(SC_daily_violations$driver_race)
+SC_daily_violations$month <- as.factor(SC_daily_violations$month)
+SC_daily_violations$day_of_week <- as.factor(SC_daily_violations$day_of_week)
+
+SC_daily_violations$race <- fct_relevel(SC_daily_violations$race, "White")
+SC_daily_violations$day_of_week <- fct_relevel(SC_daily_violations$day_of_week, "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+SC_daily_violations$dangerous_days <- fct_relevel(SC_daily_violations$dangerous_days, "Other day")
+
+model1_2 <- glm(formula = daily_num_stops ~ race + post_policy + race * post_policy + 
+                month + day_of_week + dangerous_days, 
+                data = SC_daily_violations, family = "quasipoisson")
+
+# model1_2_expanded <- glm(formula = daily_num_stops ~ race + post_policy + race * post_policy + 
+#                            month + day_of_week + dangerous_days +
+#                            race * day_of_week + race * dangerous_days + race * month, 
+#                          data = SC_daily_violations, family = "quasipoisson")
+# 
+# model1_2_expanded2 <- glm(formula = daily_num_stops ~ race + post_policy + race * post_policy + 
+#                            month + day_of_week + dangerous_days +
+#                            race * day_of_week + race * dangerous_days + race * month + 
+#                            day_of_week * month, 
+#                          data = SC_daily_violations, family = "quasipoisson")
+
+model1_2_results <- tidy(model1_2)
+model1_2_results <- model1_2_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI_12 <- as_tibble(exp(confint.default(model1_2)), rownames = "term") #tidy(exp(confint.default(model1_2)))
+
+names(CI_12) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model1_2_results <- full_join(model1_2_results, CI_12, by = "term")
+
+model1_2_results %<>% mutate(model = "Violation observed")
+
+# save the results to be recalled in the paragraph below
+est_Black_12 <- model1_2_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black_12 <- model1_2_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2) %>% format(nsmall = 2)
+CI_upper_Black_12 <- model1_2_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2) %>% format(nsmall = 2)
+
+est_Hispanic_12 <- model1_2_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic_12 <- model1_2_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic_12 <- model1_2_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+SC_daily_violations %<>% add_predictions(model1_2, type = "response") %>%
+  dplyr::rename(model1_2_predictions = pred)
+```
+
+```{r add-referent-predictions-to-dataframe, echo=F}
+
+SC_dailyv_referent <- SC_daily_violations
+SC_dailyv_referent$day_of_week <- "Wednesday"
+SC_dailyv_referent$dangerous_days <- "Other day"
+
+SC_dailyv_referent$referent_predict <- predict(object = model1_2, SC_dailyv_referent, type = "response")
+
+# SC_daily_violations %<>% add_predictions(model1_2_expanded, type = "response") %>%
+#   dplyr::rename(model1_2_exp_preds = pred)
+# 
+# SC_daily_violations %<>% add_predictions(model1_2_expanded2, type = "response") %>%
+#   dplyr::rename(model1_2_exp2_preds = pred)
+
+#Goodness of fit test comparing the original model2 to the expanded model2
+# p is very low indicating that the expanded model is a better fit
+# anova(model1_2, model1_2_expanded, test = "Chisq")
+# anova(model1_2_expanded, model1_2_expanded2, test = "Chisq")
+```
+
+```{r, echo=F}
+#Compare the interaction terms between the expanded model and the old model
+#They are almost exactly the same
+
+# model1_2_expanded2_results <- tidy(model1_2_expanded2)
+# model1_2_expanded2_results <- model1_2_expanded2_results %>% 
+#   mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+#                                   term != "(Intercept)" ~ exp(estimate)
+#                                   )
+#   )
+# 
+# # 95% confidence intervals
+# CI_123 <- as_tibble(exp(confint.default(model1_2_expanded2)), rownames = "term") #tidy(exp(confint.default(model1_2)))
+# 
+# names(CI_123) <- c( "term", "lower_CI", "upper_CI")
+# 
+# # merge estimates and CIs into one data frame
+# model1_2_expanded2_results <- full_join(model1_2_expanded2_results, CI_123, by = "term")
+# 
+# model1_2_expanded2_results %<>% mutate(model = "Violation observed")
+
+```
+
+```{r model-1-subgroup-radar-triggered-only, echo=F}
+# redo the number of stops analysis, but look at those whose stop purpose was 
+# radar triggered
+
+SC_daily_radar <- SC_after_exclusions %>% 
+  filter(stop_purpose == "Radar Triggered") %>% 
+  group_by(driver_race, stop_date) %>%
+  summarise(daily_num_stops = n(), 
+            month = first(month), 
+            day = first(day),
+            day_index = first(day_index), 
+            day_of_week = first(day_of_week),
+            fri_sat = first(fri_sat),
+            post_policy = first(post_policy),
+            dangerous_days = first(dangerous_days))
+
+SC_daily_radar$race <- as.factor(SC_daily_radar$driver_race)
+SC_daily_radar$month <- as.factor(SC_daily_radar$month)
+SC_daily_radar$day_of_week <- as.factor(SC_daily_radar$day_of_week)
+
+SC_daily_radar$race <- fct_relevel(SC_daily_radar$race, "White")
+SC_daily_radar$day_of_week <- fct_relevel(SC_daily_radar$day_of_week, "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+SC_daily_radar$dangerous_days <- fct_relevel(SC_daily_radar$dangerous_days, "Other day")
+
+model1_3 <- glm(formula = daily_num_stops ~ race + post_policy + race * post_policy + 
+                  month + day_of_week + dangerous_days, 
+              data = SC_daily_radar, family = "quasipoisson")
+
+model1_3_results <- tidy(model1_3)
+model1_3_results <- model1_3_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI_13 <- as_tibble(exp(confint.default(model1_3)), rownames = "term")
+
+names(CI_13) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model1_3_results <- full_join(model1_3_results, CI_13, by = "term")
+
+model1_3_results %<>% mutate(model = "Radar triggered")
+
+model1_all_results <- rbind(model1_results, model1_2_results, model1_3_results)
+
+model1_for_plot <- model1_all_results %>%
+  filter(term %in% c("raceBlack:post_policy", "raceHispanic:post_policy")) %>%
+  mutate(race = case_when(term == "raceBlack:post_policy" ~ "Black",
+                          term == "raceHispanic:post_policy" ~ "Hispanic"))
+
+# save the results to be recalled in the paragraph below
+est_Black_13 <- model1_3_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black_13 <- model1_3_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black_13 <- model1_3_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic_13 <- model1_3_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic_13 <- model1_3_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic_13 <- model1_3_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+SC_daily_radar %<>% add_predictions(model1_3, type = "response") %>%
+  dplyr::rename(model1_3_predictions = pred)
+
+# Why do we see a change in the radar triggered events for Hispanic vs. White drivers?
+
+#take a look at the figure 3. It looks like there was a bit of a downward trend
+#for white drivers before the policy change and so i think that is the issue
+
+num_stops_black <- model1_results %>% 
+  select(term, estimate) %>%
+  filter(term == "(Intercept)" | term == "raceBlack") %>% 
+  tidyr::spread(value = estimate, key = term) %>%
+  mutate(num_stop_black = exp(`(Intercept)` + raceBlack))
+
+num_stops_hisp <- model1_results %>% 
+  select(term, estimate) %>%
+  filter(term == "(Intercept)" | term == "raceHispanic") %>% 
+  tidyr::spread(value = estimate, key = term) %>%
+  mutate(num_stop_hispanic = exp(`(Intercept)` + raceHispanic))
+```
+
+```{r add-referent-predictions-to-dataframe_speeding, echo=F}
+
+SC_dailysp_referent <- SC_daily_radar
+SC_dailysp_referent$day_of_week <- "Wednesday"
+SC_dailysp_referent$dangerous_days <- "Other day"
+
+SC_dailysp_referent$referent_predict <- predict(object = model1_3, SC_dailysp_referent, type = "response")
+
+findings <- model1_results %>% filter(term == "post_policy") %>% select(exp_estimate, lower_CI, upper_CI)
+
+```
+
+```{r calculate-bootstrapped-estimates-and-CIs-model-1b, echo=F}
+# note: the function `bs` is found in the file 99_helper-functions.R
+# 7 seconds to run this model 
+
+set.seed(123)
+results_1b <- boot(data = SC_daily_violations, statistic = bs, R = 1000, 
+                   formula = daily_num_stops ~ race + post_policy + race * post_policy + month + day_of_week + dangerous_days,
+                   parallel = "multicore", ncpus = 8)
+
+model_1b_lcl <- boot.ci(results_1b, type="perc", index = 7)$percent[4] 
+model_1b_ucl <- boot.ci(results_1b, type="perc", index = 7)$percent[5]
+
+lcl_b_1b <- boot.ci(results_1b, type="perc", index = 8)$percent[4] 
+ucl_b_1b <- boot.ci(results_1b, type="perc", index = 8)$percent[5] 
+
+#ARR Black vs. White
+lcl_bw_1b <- boot.ci(results_1b, type="perc", index = 10)$percent[4] 
+ucl_bw_1b <- boot.ci(results_1b, type="perc", index = 10)$percent[5] 
+
+#ARR Hispanic vs. White
+lcl_hw_1b <- boot.ci(results_1b, type="perc", index = 11)$percent[4] 
+ucl_hw_1b <- boot.ci(results_1b, type="perc", index = 11)$percent[5] 
+```
+
+```{r calculate-bootstrapped-estimates-and-CIs-model-1c, echo=F}
+#STOPS FOR SPEEDING
+#7 seconds to run this model
+set.seed(123)
+results_1c <- boot(data = SC_daily_radar, statistic = bs, R = 1000, 
+                   formula = daily_num_stops ~ race + post_policy + race * post_policy + month + day_of_week + dangerous_days,
+                   parallel = "multicore", ncpus = 8)
+
+lcl_bw_1c <- boot.ci(results_1c, type="perc", index = 10)$percent[4] # additional RR black 
+ucl_bw_1c <-boot.ci(results_1c, type="perc", index = 10)$percent[5]
+
+lcl_hw_1c <-boot.ci(results_1c, type="perc", index = 11)$percent[4] # additional RR hispanic
+ucl_hw_1c <-boot.ci(results_1c, type="perc", index = 11)$percent[5]
+```
+
+For White drivers, the average number of daily traffic stops for observed 
+violations before the policy change was `r mean_visits_race %>% filter(post_policy == 0, driver_race == "White") %>% ungroup() %>% select(mean) %>% round() #marginalized: results_1b$t0[1] %>% round()`. The number of traffic
+stops increased by `r round((results_1b$t0[7]-1)*100)`% for White drivers after 
+primary enforcement 
+[RR (95% CI) = `r glue({round(results_1b$t0[7], 2) %>% format(nsmall = 2)}, " (", {round(model_1b_lcl, 2)}, ", ",  {round(model_1b_ucl, 2)}, ")")`]. 
+For Black drivers, the number of stops for observed violations before the policy
+change was `r mean_visits_race %>% filter(post_policy == 0, driver_race == "Black") %>% ungroup() %>% select(mean) %>% round() # round(results_1b$t0[2])`, which went up by `r round((results_1b$t0[8]-1)*100)`% after primary enforcement 
+[RR (95% CI) =`r glue({round(results_1b$t0[8], 2) %>% format(nsmall = 2)}, " (", {round(lcl_b_1b, 2)}, " to ",  {round(ucl_b_1b, 2)}, ")")`].
+This corresponded to an additional relative risk of being stopped of 
+`r round(results_1b$t0[10], 2)` [95% CI= `r glue({round(lcl_bw_1b, 2) %>% format(nsmall = 2)}, " to ",  {round(ucl_bw_1b, 2) %>% format(nsmall = 2)})`] 
+for Black drivers compared to White drivers (**Figure 2**). For Hispanic drivers,
+the average number of stops for observed violations before the policy change was `r mean_visits_race %>% filter(post_policy == 0, driver_race == "Hispanic") %>% ungroup() %>% select(mean) %>% round()`, 
+which went up by the same degree as experienced by White drivers, and resulted 
+in no additional relative risk of being stopped among Hispanic vs. White
+drivers for observed violations 
+[RR (95% CI)= `r glue({round(results_1b$t0[11], 2) %>% format(nsmall = 2)}, " (", {round(lcl_hw_1b, 2) %>% format(nsmall = 2)}, ", ",  {round(ucl_hw_1b, 2) %>% format(nsmall = 2)}, ")")`].
+
+Among stops for speeding, there was no additional relative risk of being stopped after
+the change to primary enforcement for Black drivers vs. White drivers 
+[RR (95% CI)= `r glue("{round(results_1c$t0[10],2) %>% format(nsmall = 2)} ({round(lcl_bw_1c, 2)}, {round(ucl_bw_1c, 2)})")`], while 
+Hispanic drivers showed a `r round(results_1c$t0[11] - 1, 2)*100`% additional 
+relative increase in their number of stops vs. White drivers 
+[RR (95% CI)= `r glue("{round(results_1c$t0[11],2)} ({round(lcl_hw_1c, 2)}, {round(ucl_hw_1c, 2)})")`].
+The regression outputs for these models are contained in **Tables S1 and S2**.
+
+### Impact on the risk of arrest and search
+
+```{r visualize-age-relationship-arrest, echo = F}
+# univariate relationship between the risk of arrest by age
+
+# restricted cubic spline with five knots
+age_spline_arrest <- glm(arrest ~ ns(driver_age, knots = c(20, 30, 40, 50, 60)), dat = SC_for_analysis)
+age_spline_search <- glm(search_conducted ~ ns(driver_age, knots = c(20, 30, 40, 50, 60)), dat = SC_for_analysis)
+
+seq_age <- seq(15, 80, length.out = 100)
+fit_arrest <- predict(age_spline_arrest, data.frame(driver_age = seq_age), type = "response")
+fit_search <- predict(age_spline_search, data.frame(driver_age = seq_age), type = "response")
+dat2 <- as.data.frame(cbind(seq_age, fit_arrest, fit_search))
+
+#plot_age <- ggplot(dat2, aes(seq_age, fit)) + 
+#  geom_line(aes(col = "Arrested")) +
+#  labs(title = "Search rate by age", x = "Age of driver", y = "Estimated risk of search") +
+#  scale_y_continuous(labels = scales::percent) + theme_minimal() + theme(legend.title = element_blank()) +
+#  geom_line(aes(y = fit_search, col = "Search conducted"))
+#ggsave(plot = plot_age, filename = "../Images/FX_search_arrest_by_age.tiff", width = 12, height = 12, device = "tiff", units = "cm")
+```
+
+```{r model-2-outcome-arrest, echo=F}
+# Logistic regression (binomial model with default logit link)
+
+# arrest is regular arrest + felony arrest
+model2a <- glm(formula = arrest ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) +
+                 post_policy + race * post_policy + 
+                 month_i + day_of_week + dangerous_days, 
+               data = SC_for_analysis, 
+               family = "binomial")
+
+model2a_results <- tidy(model2a)
+model2a_results <- model2a_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI2a <- as_tibble(exp(confint.default(model2a)), rownames = "term") #tidy(exp(confint.default(model2a)))
+
+names(CI2a) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model2a_results <- full_join(model2a_results, CI2a, by = "term")
+
+model2a_results %<>% mutate(model = "All stops")
+
+# save the results to be recalled in the paragraph below
+est_Black2a <- model2a_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black2a <- model2a_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black2a <- model2a_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic2a <- model2a_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic2a <- model2a_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic2a <- model2a_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+```
+
+```{r model-2b-outcome-arrest-among-those-with-violation-observed, echo=F, warning=F}
+# Only include stops with stop_purpose == "Violation Observed" in the data frame
+# This removes drivers pulled over for speeding (the vast majority of other offences)
+
+# Table/frequencies of stop purposes for a reminder
+# table(SC_for_analysis$stop_purpose)
+# round(prop.table(table(SC_for_analysis$stop_purpose))*100,2)
+
+model2b <- glm(formula = arrest ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) + 
+                 post_policy + race * post_policy + 
+                 month_i + day_of_week + dangerous_days, 
+               data = SC_for_analysis %>% filter(stop_purpose == "Violation Observed"), 
+               family = "binomial")
+
+model2b_results <- tidy(model2b)
+model2b_results <- model2b_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI2b <- as_tibble(exp(confint.default(model2b)), rownames = "term") #tidy(exp(confint.default(model2b)))
+names(CI2b) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model2b_results <- full_join(model2b_results, CI2b, by = "term")
+
+model2b_results %<>% mutate(model = "Violation observed")
+
+# save the results to be recalled in the paragraph below
+est_Black2b <- model2b_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black2b <- model2b_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black2b <- model2b_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic2b <- model2b_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic2b <- model2b_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic2b <- model2b_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+```
+
+```{r model-2c-outcome-arrest-among-those-speeding, echo=F}
+# Only include stops with stop_purpose == "Radar triggered" in the data frame
+# For this model use dang_days2 which does not have a level for Independence day
+# This is because there are no arrests among stops for speeding on Independence 
+# day in these data.
+
+
+model2c <- glm(formula = arrest ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) + 
+                 post_policy + race*post_policy + 
+                month_i + day_of_week + dang_days2, 
+              data = SC_for_analysis %>% filter(stop_purpose == "Radar Triggered"), 
+              family = "binomial")
+
+model2c_results <- tidy(model2c)
+model2c_results <- model2c_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI2c <- as_tibble(exp(confint.default(model2c)), rownames = "term") 
+names(CI2c) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model2c_results <- full_join(model2c_results, CI2c, by = "term")
+
+model2c_results %<>% mutate(model = "Radar triggered")
+
+# save the results to be recalled in the paragraph below
+est_Black2c <- model2c_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black2c <- model2c_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black2c <- model2c_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic2c <- model2c_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic2c <- model2c_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic2c <- model2c_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+```
+
+```{r rr-estimates-model2s, echo=F}
+# this probably should be done using smartbind() but it didn't work
+model2_results <- rbind(model2a_results, model2b_results, model2c_results)
+
+model2_plot_data <- model2_results %>%
+  filter(term %in% c("raceBlack:post_policy", "raceHispanic:post_policy")) %>%
+  mutate(race = case_when(term == "raceBlack:post_policy" ~ "Black",
+                          term == "raceHispanic:post_policy" ~ "Hispanic"))
+```
+
+```{r search-and-arrest-by-race, echo=F, eval=T}
+sa_rates <- SC_for_analysis %>%
+  group_by(race, post_policy) %>% 
+  summarise(n = n(), 
+            arrest_rate = mean(arrest),
+            arrest_count = sum(arrest),
+            search_rate = mean(search_conducted),
+            search_count = sum(search_conducted),
+            reg_arrest_rate = mean(regular_arrest),
+            reg_arrest_count = sum(regular_arrest),
+            felony_arrest_rate = mean(felony_arrest),
+            felony_arrest_count = sum(felony_arrest)
+            )
+
+# take a look at how much the felony arrests go up after the seat belt policy change
+# it went up by 7 times for White drivers, 6 times for Black drivers, and 12 times
+# for Hispanic drivers
+```
+
+```{r format-findings-model2, echo=F}
+#BLACK VS WHITE INTERACTION
+lcl_bw_2b <- boot.ci(results_2b, type = "perc", index = 10)$percent[4]
+ucl_bw_2b <- boot.ci(results_2b, type = "perc", index = 10)$percent[5]
+
+#HISPANIC VS WHITE INTERACTION
+lcl_hw_2b <- boot.ci(results_2b, type = "perc", index = 11)$percent[4]
+ucl_hw_2b <- boot.ci(results_2b, type = "perc", index = 11)$percent[5]
+
+#BLACK VS WHITE INTERACTION for speeding
+lcl_bw_2c <- boot.ci(results_2c, type = "perc", index = 10)$percent[4]
+ucl_bw_2c <- boot.ci(results_2c, type = "perc", index = 10)$percent[5]
+
+#HISPANIC VS WHITE INTERACTION for speeding
+lcl_hw_2c <- boot.ci(results_2c, type = "perc", index = 11)$percent[4]
+ucl_hw_2c <- boot.ci(results_2c, type = "perc", index = 11)$percent[5]
+```
+
+Prior to primary enforcement, Hispanic drivers faced higher risks of search and 
+arrest than White and Black drivers (**Figure 3 and Figure 4**). Hispanic drivers were arrested during 
+`r sa_rates %>% filter(race == "Hispanic", post_policy == 0) %>% pull(arrest_rate) %>% scales::percent(accuracy = 0.1)` 
+of stops and searched 
+during `r sa_rates %>% filter(race == "Hispanic", post_policy == 0) %>% pull(search_rate) %>% scales::percent(accuracy = 0.1)` 
+of stops. The corresponding risks of arrest and search for Black drivers were both 
+less than `r sa_rates %>% filter(race == "Black", post_policy == 0) %>% pull(arrest_rate) %>% scales::percent(accuracy = 0.1)`
+and for White drivers were both less than 
+`r sa_rates %>% filter(race == "White", post_policy == 0) %>% pull(arrest_rate) %>% scales::percent(accuracy = 0.1)`.
+
+Because the policy change led to a 30% increase in the number of 
+traffic stops overall, the denominator for the arrest rate increased 
+substantially after the policy change. Among stops for observed violations, the 
+arrest rate to White drivers was not materially
+affected by primary enforcement, but it decreased for Black drivers, 
+and increased for Hispanic drivers. These resulted in a reduced risk ratio for Black drivers 
+[RR (95% CI) = `r glue("{results_2b$t0[10] %>% round(2)} ({lcl_bw_2b %>% round(2)}, {ucl_bw_2b %>% round(2)})")`]
+and an excess risk ratio for Hispanic drivers 
+[RR (95% CI) = `r glue("{results_2b$t0[11] %>% round(2)} ({lcl_hw_2b %>% round(2)}, {ucl_hw_2b %>% round(2)})")`]
+compared to White drivers (**Figure 3**). Among stops for speeding, neither 
+White or Black drivers experienced a change in the rate of arrest after the 
+policy change, while the arrest rate for Hispanic drivers increased from 4.1% to 5.9%,
+yielding a risk ratio of 
+`r results_2c$t0[11] %>% round(2)` [95%CI = `r glue({lcl_hw_2c %>% round(2)}, ", ", {ucl_hw_2c %>% round(2) %>% format(nsmall=2)})`].
+The regression outputs for these models are contained in **Tables S3 and S4**.
+
+```{r outcome-search-conducted, echo=F}
+model3a <- glm(formula = search_conducted ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) + 
+                 post_policy + race * post_policy + 
+                 month_i + day_of_week + dangerous_days, data = SC_for_analysis, 
+              family = "binomial")
+
+model3a_results <- tidy(model3a)
+model3a_results <- model3a_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI3a <- as_tibble(exp(confint.default(model3a)), rownames = "term") #tidy(exp(confint.default(model3a)))
+names(CI3a) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model3a_results <- full_join(model3a_results, CI3a, by = "term")
+
+model3a_results %<>% mutate(model = "All stops")
+
+# save the results to be recalled in the paragraph below
+est_Black3a <- model3a_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black3a <- model3a_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black3a <- model3a_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic3a <- model3a_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic3a <- model3a_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic3a <- model3a_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+```
+
+```{r model3b, echo = F}
+# Only include stops with stop_purpose == "Violation Observed" in the data frame
+# This removes drivers pulled over for speeding (the vast majority of other offences)
+
+# Table/frequencies of stop purposed for a reminder
+# table(SC_for_analysis$stop_purpose)
+# round(prop.table(table(SC_for_analysis$stop_purpose))*100,2)
+
+model3b <- glm(formula = search_conducted ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) + 
+                 post_policy + race*post_policy + 
+                month_i + day_of_week + dangerous_days, 
+              data = SC_for_analysis %>% filter(stop_purpose == "Violation Observed"), 
+              family = "binomial")
+
+model3b_results <- tidy(model3b)
+model3b_results <- model3b_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI3b <- as_tibble(exp(confint.default(model3b)), rownames = "term") #tidy(exp(confint.default(model3b)))
+names(CI3b) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model3b_results <- full_join(model3b_results, CI3b, by = "term")
+model3b_results %<>% mutate(model = "Violation observed")
+
+# save the results to be recalled in the paragraph below
+est_Black3b <- model3b_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2) %>% format(nsmall = 2)
+CI_lower_Black3b <- model3b_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black3b <- model3b_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic3b <- model3b_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic3b <- model3b_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic3b <- model3b_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+# Similar conclusions for model 2_2 vs model 2:
+# Conclusion from model 2: 12% increase in odds of Hispanic drivers being arrested CI 1.03-1.22
+# For Black drivers:14% decrease in odds CI 0.81-0.92
+```
+
+```{r model3c, echo = F}
+# Only include stops with stop_purpose == "Radar Triggered" in the analysis
+
+model3c <- glm(formula = search_conducted ~ race + driver_gender + ns(driver_age, knots = c(20, 30, 40, 50, 60)) + 
+                 post_policy + race*post_policy + 
+                month_i + day_of_week + dangerous_days, 
+              data = SC_for_analysis %>% filter(stop_purpose == "Radar Triggered"), 
+              family = "binomial")
+
+model3c_results <- tidy(model3c)
+model3c_results <- model3c_results %>% 
+  mutate(exp_estimate = case_when(term == "(Intercept)" ~ NA_real_,
+                                  term != "(Intercept)" ~ exp(estimate)
+                                  )
+  )
+
+# 95% confidence intervals
+CI3c <- as_tibble(exp(confint.default(model3c)), rownames = "term") #tidy(exp(confint.default(model3b)))
+names(CI3c) <- c( "term", "lower_CI", "upper_CI")
+
+# merge estimates and CIs into one data frame
+model3c_results <- full_join(model3c_results, CI3c, by = "term")
+model3c_results %<>% mutate(model = "Radar triggered")
+
+# save the results to be recalled in the paragraph below
+est_Black3c <- model3c_results %>% filter(term == "raceBlack:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Black3c <- model3c_results %>% filter(term == "raceBlack:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Black3c <- model3c_results %>% filter(term == "raceBlack:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+est_Hispanic3c <- model3c_results %>% filter(term == "raceHispanic:post_policy") %>% select(exp_estimate) %>% unlist() %>% round(2)
+CI_lower_Hispanic3c <- model3c_results %>% filter(term == "raceHispanic:post_policy") %>% select(lower_CI) %>% unlist() %>% round(2)
+CI_upper_Hispanic3c <- model3c_results %>% filter(term == "raceHispanic:post_policy") %>% select(upper_CI) %>% unlist() %>% round(2)
+
+```
+
+```{r rr-estimates-model3s, echo=F}
+# this probably should be done using smartbind() but it didn't work
+model3_results <- rbind(model3a_results, model3b_results, model3c_results)
+
+model3_plot_data <- model3_results %>%
+  filter(term %in% c("raceBlack:post_policy", "raceHispanic:post_policy")) %>%
+  mutate(race = case_when(term == "raceBlack:post_policy" ~ "Black",
+                          term == "raceHispanic:post_policy" ~ "Hispanic"),
+         stop_purpose = fct_relevel(model, "All stops", "Violation observed", "Radar triggered"))
+```
+
+```{r format-findings-model3, echo=F}
+
+#BLACK VS WHITE INTERACTION for observed violations
+lcl_bw_3b <- boot.ci(results_3b, type = "perc", index = 10)$percent[4]
+ucl_bw_3b <- boot.ci(results_3b, type = "perc", index = 10)$percent[5]
+
+#HISPANIC VS WHITE INTERACTION for observed violations
+lcl_hw_3b <- boot.ci(results_3b, type = "perc", index = 11)$percent[4]
+ucl_hw_3b <- boot.ci(results_3b, type = "perc", index = 11)$percent[5]
+
+#BLACK VS WHITE INTERACTION for speeding
+lcl_bw_3c <- boot.ci(results_3c, type = "perc", index = 10)$percent[4]
+ucl_bw_3c <- boot.ci(results_3c, type = "perc", index = 10)$percent[5]
+
+#HISPANIC VS WHITE INTERACTION for speeding
+lcl_hw_3c <- boot.ci(results_3c, type = "perc", index = 11)$percent[4]
+ucl_hw_3c <- boot.ci(results_3c, type = "perc", index = 11)$percent[5]
+```
+  
+The results for the effect of the policy change on search rates was similar to 
+the results presented for arrest rates (**Figure 4**). Hispanic drivers 
+experienced a larger increase to their search rate, especially 
+among those who were stopped for speeding 
+[RR (95%CI)= `r glue("{results_3c$t0[11] %>% round(2)} ({lcl_hw_3c %>% round(2)}, {ucl_hw_3c %>% round(2)})")`].
+Black drivers had a reduction to their search rate compared
+to White drivers among stops for observed violations 
+[RR (95%CI)= `r glue("{results_3b$t0[10] %>% round(2) %>% format(nsmall=2)} ({lcl_bw_3b %>% round(2)}, {ucl_bw_3b %>% round(2)})")`] (**Tables S5 and S6**).

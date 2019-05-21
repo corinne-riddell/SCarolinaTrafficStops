@@ -1,0 +1,60 @@
+---
+title: "2_04_methods"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Methods
+
+### The Stanford Open Policing Project
+
+The Stanford Open Policing Project includes data on more than 136 million state patrol stops from 32 states.^9,11^ The time period of data availability varies by state, with data representing a variable number of years between 1996 and 2018. These data were assembled by Stanford University through public record requests to state law enforcement agencies. These agencies maintained electronic traffic stop records, with data on driver and officer demographics, and stop details. There were 8,440,934 stops im South Carolina between 2005 and 2016.^11^ We used data on the date of the traffic stop, driver race/ethnicity (Black, Hispanic, or White), driver age (in years), driver gender (male or female), stop outcome (citation, warning, or arrest), and stop purpose (“radar triggered” or “violation observed”). “Radar triggered” stops are for breaking the speed limit, and “violation observed” stops included seat belt violations, failing to stop at a red light, etc. The dataset also contained information on whether the stop led to a search of the vehicle, whether the stop resulted in an arrest or felony arrest, and the police department of the officer making the stop.
+
+### Inclusion criteria
+
+Given prior work indicating that the effects of primary enforcement upgrades on seat belt use have little delay,^12^ we limited the time frame to 2005-2006-- approximately one calendar year before and after the law change. To be included in the analytic dataset, drivers had to be identified in the dataset as Black, Hispanic, or White, and the stop had to be conducted by the South Carolina Highway Patrol as opposed to the limited number of stops made by either the Bureau of Protective Services, the State Transport Police, or with missing department information.
+
+### Identification strategy
+
+```{r notes, echo=F, eval=F}
+#robust variance vs. quasipoisson specification in R:
+#https://data.princeton.edu/wws509/r/overdispersion
+#An alternative approach is to fit a Poisson model and use the robust or sandwich 
+#estimator of the standard errors. This usually gives results very similar to the over-dispersed Poisson model.
+
+#https://stats.stackexchange.com/questions/62006/definition-of-dispersion-parameter-for-quasipoisson-family
+```
+
+Our primary interest is in the contrast between the observed outcome rates after the upgrade to primary enforcement and the counterfactual rates had South Carolina not upgraded their law. We rely on an identification strategy that treats the precise timing of South Carolina’s policy change as an exogenous source of variation in traffic stops. We used quasi-Poisson regression to estimate whether the policy change led to a disproportionate increase in the daily number of stops among Hispanic and Black drivers compared with White drivers. This model includes an indicator term for before/after the policy change ($\beta$), indicators for Black and Hispanic race/ethnicity ($\boldsymbol{\alpha}$), and product terms between the policy and race variables ($\boldsymbol{\gamma}$). This model also included binary indicators for day of the week ($\boldsymbol{\delta_w}$), month ($\boldsymbol{\eta_m}$), and holidays ($\boldsymbol{\theta_h}$), to absorb variation in the time series related to increased risk of experiencing traffic stops associated with those factors independently of the policy change. To account for overdispersion, the quasi-Poisson model lets the variance of the number of stops be a linear function of the mean.^13^ The full model is:
+
+$$\text{number of stops} \sim Pois(\mu)$$
+
+$$Var(Y|X\beta) = \phi\mu$$
+
+$$log(E(\text{number of stops})) = Int + \boldsymbol{\alpha}*race + \beta*policy + \boldsymbol{\gamma}*race*policy + \boldsymbol{\delta_w} + \boldsymbol{\eta_m} + \boldsymbol{\theta_h}   $$
+
+We did not include a population denominator offset because it is impossible to enumerate the denominator population of persons actively driving (or person-miles driven) in South Carolina by race. Vehicles stopped may be from out of state, so there is no well-defined population at risk. Because we focus on changes in stops induced by the policy shift, we reduce bias from the lack of denominators.^14^ This invokes the plausible assumption that unknown denominators were roughly constant during 2005-2006 rather than discontinuous around December 2005.
+
+We used logistic regression to estimate the differential effect of the policy change on the risk of arrest for Black and Hispanic drivers vs. White drivers, conditional on being stopped. Because this model is at the individual-level and the risk of being arrested or searched is higher among young men, we expanded the list of covariates from the previous model to include categorical gender and a restricted cubic spline for age with internal knots by decade between ages 20 and 60 years. The full model for the risk of arrest can be written as: 
+
+$$logit(E(arrest)) = Int + f(age) + \kappa_g + \boldsymbol{\alpha}*race + \beta*policy + \boldsymbol{\gamma}*race*policy + \boldsymbol{\delta_w}  + \boldsymbol{\eta_m} + \boldsymbol{\theta_h} $$
+Here, $f(age)$ represents the resticted cubic spline for age. 
+
+A similar model was employed for search rate and used to estimate whether the change in policy was associated with an additional proportional increase in the search rate for Hispanic and Black. For the arrest and search models, the data set contains one row of data for each traffic stop, while the quasi-Poisson model for the daily number of stops had one row of data for each race-day combination.
+
+### Marginal standardization
+
+To calculate whether Black and Hispanic drivers experienced disproportionately more stops, arrests and searches, we calculated relative risks using marginal standardization.^15^ We used the percentile bootstrap method to estimate 95% confidence intervals for the relative risks based on 1,000 bootstrap replicates.
+
+### Falsification test
+
+All models were run within strata of stops that were coded as being for “Violations oberserved” or “Radar triggered” (speeding). The enactment of the seat belt policy change should not lead to a change in the number of people pulled over for speeding, since the number of speeders is expected to be the same directly before and after the policy change.^16^ Any change in the number of stops for speeding (overall, or differentially by race/ethnicity) could imply the presence of a factor other than the seat belt policy change leading to more stops. We therefore used stops for speeding as a falsification test for our identification strategy.
+
+Analyses were conducted using R 3.5.3.^17^ The code to reproduce the analyses is contained in an online repository on the lead author’s GitHub: https://github.com/corinne-riddell/SCTrafficStops. This study did not require institutional review because it is considered repository research of deidentified information.^18^
+
+
+
+

@@ -1,0 +1,399 @@
+---
+title: "Add variables and conduct the exploratory data analysis"
+author: "Corinne Riddell"
+date: "Jan 2, 2019"
+output: html_document
+---
+
+```{r load_libraries, echo=F, warning=F, message=F}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r load-raw-data-subset}
+# Update this pathway to where you saved these data in the previous Rmd file (0_Save-raw-date-subset.Rmd)
+load(file = "/Volumes/Untitled/Dropbox/Police-Stops/Raw-data/Raw-data-05-12.Rdata") #loads SC_subset into the environment
+```
+
+```{r aggregate-to-daily-stops}
+summary1 <- SC_subset %>% 
+  group_by(stop_date) %>%
+  summarise(visits_per_day = n())
+```
+
+There are heightened traffic stops on certain days of the year, mostly to check
+for drunk or impaired driving. We refer to these days as "dangerous days". Such 
+days often correspond to holidays. There are also heightened stops on weekends.
+
+```{r add-variables-to-daily-and-aggregated-datasets}
+SC_subset <- SC_subset %>%
+  mutate(year = year(stop_date), 
+         month = month(stop_date), 
+         day = day(stop_date), 
+         day_index = yday(stop_date), # day of the year
+         day_of_week = weekdays(as.Date(stop_date)),
+         fri_sat = ifelse(day_of_week %in% c("Friday", "Saturday"), 
+                          "Friday or Saturday", "Another day"))
+                    
+summary1 <- summary1 %>% 
+  arrange(stop_date) %>%
+  mutate(year = year(stop_date), 
+         month = month(stop_date), 
+         day = day(stop_date), 
+         day_counter = row_number(), # this is a bit hacky - would break if there was a day with zero visits
+         day_index = yday(stop_date), # day of the year
+         day_of_week = weekdays(as.Date(stop_date)),
+         fri_sat = ifelse(day_of_week %in% c("Friday", "Saturday"), 
+                          "Friday or Saturday", "Another day"))
+                    
+summary1 <- summary1 %>% mutate(
+  dangerous_days = case_when(day == 31 & month == 12 ~ "New Year's",
+                             day == 1 & month == 1 ~ "New Year's",
+                             day == 4 & month == 7 ~ "Independence day",
+                             day == 18 & month == 3 ~ "Day after St. Patrick's",
+                             day %in% c(24, 25, 26) & month == 11 & year == 2005 ~ "Thanksgiving weekend", # Thanksgiving Thurs + Friday + Saturday
+                             day %in% c(23, 24, 25) & month == 11 & year == 2006 ~ "Thanksgiving weekend",
+                             day %in% c(22, 23, 24) & month == 11 & year == 2007 ~ "Thanksgiving weekend", 
+                             day %in% c(28, 29, 30) & month == 11 & year == 2008 ~ "Thanksgiving weekend",
+                             day %in% c(26, 27, 28) & month == 11 & year == 2009 ~ "Thanksgiving weekend", 
+                             day %in% c(25, 26, 27) & month == 11 & year == 2010 ~ "Thanksgiving weekend",
+                             day %in% c(24, 25, 26) & month == 11 & year == 2011 ~ "Thanksgiving weekend", 
+                             day %in% c(22, 23, 24) & month == 11 & year == 2012 ~ "Thanksgiving weekend",
+                             day %in% c(2,3,4,5) & month == 9 & year == 2005 ~ "Labor Day weekend", # Monday + preceding Friday, Saturday, Sunday
+                             day %in% c(1,2,3,4) & month == 9 & year == 2006 ~ "Labor Day weekend",
+                             day %in% c(1,2,3) & month == 9 & year == 2007 ~ "Labor Day weekend",
+                             day == 31 & month == 8 & year == 2007 ~ "Labor Day weekend",
+                             day == 1 & month == 9 & year == 2008 ~ "Labor Day weekend",
+                             day %in% c(29, 30, 31) & month == 8 & year == 2008 ~ "Labor Day weekend",
+                             day %in% c(4,5,6,7) & month == 9 & year == 2009 ~ "Labor Day weekend",
+                             day %in% c(3,4,5,6) & month == 9 & year == 2010 ~ "Labor Day weekend",
+                             day %in% c(2,3,4,5) & month == 9 & year == 2011 ~ "Labor Day weekend",
+                             day %in% c(1,2,3) & month == 9 & year == 2012 ~ "Labor Day weekend",
+                             day == 31 & month == 8 & year == 2012 ~ "Labor Day weekend")
+)
+```
+
+The policy was implemented on December 9th, 2005.
+
+```{r add-policy-indicator-to-aggregated-dataset}
+summary1 <- summary1 %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0))
+```
+
+Time trend of the number of stops per day, before and after the policy change.
+
+Smoothed fitted lines are added separately for each year of data. 
+
+Want to see whether there is a discontinuous change in the number of stops
+between 2005 and 2006 (since the policy change is implemented in Dec 2005).
+
+Want to also assess temporal patterns in the other years
+
+```{r visualize-stops-per-day, echo = F, fig.width = 10, fig.height=5}
+dim(SC_subset)
+str(SC_subset)
+
+ggplot(summary1, aes(x = as.Date(stop_date), y = visits_per_day)) + 
+  geom_line(lwd = 0.25)+ 
+  geom_point(aes(col = dangerous_days, pch = fri_sat)) + 
+  scale_shape_manual(values = c(19,3)) +
+  scale_color_discrete(na.value="black", 
+                      breaks = c("New year's", "Day after St. Patrick's",
+                                 "Independence day", "Labor Day weekend", 
+                                 "Thanksgiving weekend")) +
+  geom_vline(xintercept = as.numeric(as.Date("2005-12-09")), linetype=4, col = "red") +
+  xlab("Date") + ylab("Number of traffic stops") + theme_minimal() +
+  ggtitle("Number of stops over time") +
+  guides(colour = guide_legend(title = element_blank()), shape = guide_legend(title = element_blank())) +
+  geom_text(aes(x = as.Date("2005-12-09"), y = 4250), 
+            label = "Primary seat belt\nenforcement began", col = "red",
+            check_overlap = T, nudge_x = 75) + 
+  geom_smooth(dat = summary1 %>% filter(post_policy == 0), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) + 
+  geom_smooth(dat = summary1 %>% filter(year == 2006), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2007), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2008), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2009), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2010), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2011), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5) +
+  geom_smooth(dat = summary1 %>% filter(year == 2012), aes(x = as.Date(stop_date), y = visits_per_day), span = 0.5)
+
+policy <- data.frame(year = c(2005:2006), Z = c(342,NA))  #this tiny data frame is used to draw a line in the following plots using geom_vline().
+
+ggplot(summary1 %>% filter(year %in% c(2005, 2006)), aes(x = day_index, y = visits_per_day)) + 
+  geom_point(aes(col = dangerous_days, pch = fri_sat)) + 
+  geom_smooth(dat = summary1 %>% filter(post_policy == 0), aes(x = day_index, y = visits_per_day), span = 0.5) +  
+  geom_smooth(dat = summary1 %>% filter(year == 2006), aes(x = day_index, y = visits_per_day), span = 0.5) +
+  scale_color_discrete(na.value="black") +
+  geom_vline(data = policy, aes(xintercept = Z), linetype = 4, col = "red") +
+  xlab("Date") + ylab("Number of traffic stops") + theme_minimal() +
+  ggtitle("Number of stops over time") + 
+  facet_wrap(~ year, nrow = 2)
+
+ggplot(summary1, aes(x = day_index, y = visits_per_day, group = year)) + 
+  geom_point(aes(col = factor(year), pch = fri_sat)) + 
+    geom_smooth(aes(col = factor(year)), span = 0.5) +
+  scale_color_discrete(na.value="black") +
+  geom_vline(data = policy, aes(xintercept = Z), linetype = 4, col = "red") +
+  xlab("Date") + ylab("Number of traffic stops") + theme_minimal() +
+  ggtitle("Number of stops over time") 
+
+```
+
+**Police department**
+
+```{r print-police-dept}
+table(SC_subset$police_department)
+
+round(prop.table(table(SC_subset$police_department))*100, 2)
+
+table(SC_subset$police_department, SC_subset$year)
+```
+
+Acronyms (from https://scdps.sc.gov/):
+
+- BPS: Bureau of Protective Services. Note the fewer visits in 2005 vs other years
+- IEU: Immigration enforcement unit: No visits in 2005/2006. Implemented in mid-2007
+- SCHP: South Carolina Highway Patrol: This is the department of interext
+- STP: State Transport Police: Charged with enforcement for commercial trucks/buses. Not of interest.
+
+### Remake the above plots only using data from the highway patrol.
+
+```{r inclue-highway-patrol-only}
+summary2 <- SC_subset %>% 
+  filter(police_department == "SCHP") %>%
+  group_by(stop_date) %>%
+  summarise(visits_per_day = n())
+```
+
+There are heightened traffic stops on certain days of the year, mostly to check
+for drunk or impaired driving. We refer to these days as "dangerous days". Such 
+days often correspond to holidays. There are also heightened stops on weekends.
+
+```{r add-variables}
+summary2 <- summary2 %>% 
+  arrange(stop_date) %>%
+  mutate(year = year(stop_date), 
+         month = month(stop_date), 
+         day = day(stop_date), 
+         day_counter = row_number(), # this is a bit hacky - would break if there was a day with zero visits
+         day_index = yday(stop_date), # day of the year
+         day_of_week = weekdays(as.Date(stop_date)),
+         fri_sat = ifelse(day_of_week %in% c("Friday", "Saturday"), 
+                          "Friday or Saturday", "Another day")) %>% 
+  mutate(
+    dangerous_days = case_when(day == 31 & month == 12 ~ "New Year's",
+                             day == 1 & month == 1 ~ "New Year's",
+                             day == 4 & month == 7 ~ "Independence day",
+                             day == 18 & month == 3 ~ "Day after St. Patrick's",
+                             day %in% c(24, 25, 26) & month == 11 & year == 2005 ~ "Thanksgiving weekend", # Thanksgiving Thurs + Friday + Saturday
+                             day %in% c(23, 24, 25) & month == 11 & year == 2006 ~ "Thanksgiving weekend",
+                             day %in% c(22, 23, 24) & month == 11 & year == 2007 ~ "Thanksgiving weekend", 
+                             day %in% c(28, 29, 30) & month == 11 & year == 2008 ~ "Thanksgiving weekend",
+                             day %in% c(26, 27, 28) & month == 11 & year == 2009 ~ "Thanksgiving weekend", 
+                             day %in% c(25, 26, 27) & month == 11 & year == 2010 ~ "Thanksgiving weekend",
+                             day %in% c(24, 25, 26) & month == 11 & year == 2011 ~ "Thanksgiving weekend", 
+                             day %in% c(22, 23, 24) & month == 11 & year == 2012 ~ "Thanksgiving weekend",
+                             day %in% c(2,3,4,5) & month == 9 & year == 2005 ~ "Labor Day weekend", # Monday + preceding Friday, Saturday, Sunday
+                             day %in% c(1,2,3,4) & month == 9 & year == 2006 ~ "Labor Day weekend",
+                             day %in% c(1,2,3) & month == 9 & year == 2007 ~ "Labor Day weekend",
+                             day == 31 & month == 8 & year == 2007 ~ "Labor Day weekend",
+                             day == 1 & month == 9 & year == 2008 ~ "Labor Day weekend",
+                             day %in% c(29, 30, 31) & month == 8 & year == 2008 ~ "Labor Day weekend",
+                             day %in% c(4,5,6,7) & month == 9 & year == 2009 ~ "Labor Day weekend",
+                             day %in% c(3,4,5,6) & month == 9 & year == 2010 ~ "Labor Day weekend",
+                             day %in% c(2,3,4,5) & month == 9 & year == 2011 ~ "Labor Day weekend",
+                             day %in% c(1,2,3) & month == 9 & year == 2012 ~ "Labor Day weekend",
+                             day == 31 & month == 8 & year == 2012 ~ "Labor Day weekend")
+) %>%
+  mutate(post_policy = case_when(year > 2005 ~ 1,
+                                 year == 2005 & month < 12 ~ 0,
+                                 year == 2005 & month == 12 & day >= 9 ~ 1,
+                                 year == 2005 & month == 12 & day < 9 ~ 0))
+```
+
+**Smoothed time trends in traffic stops for the highway patrol only, 2005-2012**
+
+```{r}
+ggplot(summary2, aes(x = day_index, y = visits_per_day, group = year)) + 
+  #geom_point(aes(col = factor(year), pch = fri_sat)) + 
+    geom_smooth(aes(col = factor(year)), span = 0.5, se = F) +
+  scale_color_discrete(na.value="black") +
+  geom_vline(data = policy, aes(xintercept = Z), linetype = 4, col = "red") +
+  xlab("Date") + ylab("Number of traffic stops") + theme_minimal() +
+  ggtitle("Number of stops over time") 
+```
+
+Can see that the largest difference among the years is between 2005 and 2006. 
+The number of stops did continue to increase in 2007 and 2008, with 2009-2012 
+overlapping more. 
+
+**All variables (not yet described)**
+
+```{r print-var-names}
+names(SC_subset)
+```
+
+```{r restrict-to-2005-2006}
+SC_05_06 <- SC_subset %>% 
+  mutate(year = year(stop_date)) %>% 
+  filter(year %in% c(2005, 2006))
+```
+
+Examine variable values:
+
+**Counties**
+
+```{r print-county-names}
+length(unique(SC_05_06$county_name))
+unique(SC_05_06$county_name)
+
+round( prop.table( table( SC_05_06$county_name == "" ) ) * 100, 1 )
+```
+
+**Gender, age, race**
+
+```{r drive-demographics} 
+table(SC_05_06$driver_gender, useNA = "always")
+round(prop.table(table(SC_05_06$driver_gender, useNA = "always")) * 100, 1)
+
+#raw race and race re-code
+table(SC_05_06$driver_race_raw)
+table(SC_05_06$driver_race, SC_05_06$driver_race_raw)
+
+round(prop.table(table(SC_05_06$driver_race, useNA = "always"))*100,1)
+
+ggplot(SC_05_06 %>% filter(driver_race %in% c("Black", "Hispanic", "White")), aes(driver_age)) + 
+  geom_histogram(col = "white", binwidth = 5, fill = "#15534C") + 
+  facet_wrap( ~ driver_race) + 
+  ggtitle("Histogram of driver's age for blacks, whites, and Hispanics") +
+  theme_minimal() + labs(x = "Age", y = "Count")
+
+ggplot(SC_05_06 %>% filter(driver_race %in% c("Black", "Hispanic", "White")), aes(driver_age)) + 
+  geom_density(col = "white", aes(fill = driver_race), alpha = 0.5) + 
+  ggtitle("Histogram of driver's age for blacks, whites, and Hispanics") +
+  theme_minimal() + labs(x = "Age", y = "Count")
+
+#include only highway patrol stops
+ggplot(SC_05_06 %>% filter(driver_race %in% c("Black", "Hispanic", "White"), police_department == 'SCHP'), aes(driver_age)) + 
+  geom_density(col = "white", aes(fill = driver_race), alpha = 0.5) + 
+  ggtitle("Histogram of driver's age for blacks, whites, and Hispanics") +
+  theme_minimal() + labs(x = "Age", y = "Count")
+
+#stratify by gender
+ggplot(SC_05_06 %>% filter(driver_race %in% c("Black", "Hispanic", "White")), aes(driver_age)) + 
+  geom_density(col = "white", aes(fill = driver_race), alpha = 0.5) + 
+  ggtitle("Histogram of driver's age for blacks, whites, and Hispanics") +
+  theme_minimal() + labs(x = "Age", y = "Count") +
+  facet_wrap(~driver_gender)
+```
+
+Note: Hispanic drivers are younger that White and Black drivers. Much fewer of them
+are older than 50. 
+
+**Violation**
+
+```{r violation-informaiton}
+length(unique(SC_05_06$violation_raw))
+table(SC_05_06$violation_raw, SC_05_06$police_department, useNA = "always")
+
+length(unique(SC_05_06$violation))
+table(SC_05_06$violation, useNA = "always")
+
+```
+
+Can see that the BPS and STP have relatively more stops for excess weight, length,
+or width and other commercial-truck related violations.
+
+**Stop purpose**
+
+```{r stop-purpose}
+table(SC_05_06$stop_purpose, useNA = "always")
+round(prop.table(table(SC_05_06$stop_purpose, useNA = "always"))*100, 1)
+round(prop.table(table(SC_05_06$driver_race, SC_05_06$stop_purpose), 1)*100, 1)
+
+table(SC_05_06$stop_purpose, SC_05_06$police_department, useNA = "always")
+table(SC_subset$stop_purpose, SC_subset$police_department, useNA = "always")
+```
+
+**Search and contraband**
+
+```{r search-contraband}
+SC_05_06 %>% count(search_conducted)
+
+table(SC_05_06$search_conducted)
+round(prop.table(table(SC_05_06$search_conducted))*100,1)
+
+table(SC_05_06$search_type_raw)
+
+table(SC_05_06$contraband_found)
+
+round(prop.table(table(SC_05_06$search_conducted, SC_05_06$contraband_found), 1)*100, 1)
+```
+
+**Stop outcome**
+
+```{r stop-outcome}
+table(SC_05_06$stop_outcome)
+round(prop.table(table(SC_05_06$stop_outcome))*100, 1)
+
+table(SC_05_06$driver_race, SC_05_06$stop_outcome)
+round(prop.table(table(SC_05_06$driver_race, SC_05_06$stop_outcome), 1)*100, 1)
+
+table(SC_05_06$is_arrested)
+round(prop.table(table(SC_05_06$is_arrested))*100, 1)
+round(prop.table(table(SC_05_06$driver_race, SC_05_06$is_arrested), 1)*100, 1)
+```
+
+**Officer id, race, age**
+
+```{r office-demographics}
+officer_level <- SC_05_06 %>% 
+  group_by(officer_id, year) %>%
+  summarise(num_stops_per_officer_year = n()) 
+
+ggplot(officer_level %>% filter(officer_id != "", year == 2005), 
+       aes(x = num_stops_per_officer_year)) + 
+  geom_histogram(binwidth = 25, col = "white")
+
+SC_05_06 %>% 
+  group_by(year(stop_date)) %>% 
+  summarise(num_officers = length(unique(officer_id)),
+            ave_num_stops = round(n()/num_officers))
+
+officer_ids_2005 <- SC_05_06 %>%
+  filter(year(stop_date) == 2005) %>% 
+  select(officer_id) %>% unique()
+
+officer_ids_2006 <- SC_05_06 %>%
+  filter(year(stop_date) == 2006) %>% 
+  select(officer_id) %>% unique()
+
+officer_ids_bothyears <- inner_join(officer_ids_2005, officer_ids_2006)
+
+SC_05_06 %>% filter(officer_id %in% officer_ids_bothyears$officer_id) %>% dim()
+
+table(SC_05_06$officer_race)
+round(prop.table(table(SC_05_06$officer_race)) * 100, 2)
+
+ggplot(SC_05_06 %>% 
+         filter(officer_race %in% c("Black", "White")), aes(officer_age)) + 
+  geom_histogram(binwidth = 5, col = "white", fill = "#15534C") + 
+  ggtitle("Histogram of officers's age for black and white officers") + 
+  facet_wrap(~ officer_race)+
+  theme_minimal() + xlab("Age") + ylab("Count")
+```
+
+**Example county**
+
+```{r example-county}
+Abbeville <- SC_05_06 %>% filter(county_name == "Abbeville County")
+Abbeville %>% group_by(road_number) %>% tally() %>% arrange(-n)
+```
+
+```{r save-enhanced-data}
+save(summary1, file = "../Data/Aggregated-data-05-12.Rdata")
+save(SC_05_06, file = "../Data/Enhanced-data-05-06.Rdata")
+```

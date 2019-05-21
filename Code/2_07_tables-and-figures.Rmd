@@ -1,0 +1,878 @@
+---
+title: "2_07_tables-and-figures"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output: html_document
+---
+
+## Tables and Figures
+
+**Figure 1: Daily number of traffic stops in South Carolina by the highway 
+patrol to White, Black, and Hispanic drivers, stratified by stop purpose, 
+2005-2006**
+
+```{r, echo=F, fig.height=10, warning=F}
+SC_daily2 <- SC_after_exclusions %>% 
+  filter(stop_purpose %in% c("Radar Triggered", "Violation Observed")) %>% #only excludes <1% stops
+  group_by(driver_race, stop_date, stop_purpose) %>%
+  summarise(daily_num_stops = n(), 
+            month = first(month), 
+            day = first(day),
+            day_index = first(day_index), 
+            day_of_week = first(day_of_week),
+            fri_sat = first(fri_sat),
+            post_policy = first(post_policy),
+            dangerous_days = first(dangerous_days))
+
+SC_daily2$race <- as.factor(SC_daily2$driver_race)
+SC_daily2$month <- as.factor(SC_daily2$month)
+SC_daily2$day_of_week <- as.factor(SC_daily2$day_of_week)
+
+SC_daily2$race <- fct_relevel(SC_daily2$race, "White")
+SC_daily2$day_of_week <- fct_relevel(SC_daily2$day_of_week, "Sunday")
+SC_daily2$dangerous_days <- fct_relevel(SC_daily2$dangerous_days, "Other day")
+
+SC_daily2 <- SC_daily2 %>% mutate(day_counter = difftime(ymd(stop_date), ymd("2005-01-01"), units = "days"))
+
+SC_daily2$dangerous_days2 <- SC_daily2$dangerous_days
+SC_daily2$dangerous_days2[SC_daily2$dangerous_days == "Other day"] <- NA
+
+# SC_daily2 <- merge(SC_daily2, SC_daily_radar %>% select(stop_date, driver_race, model1_3_predictions), by = c("stop_date", "driver_race"), all.x = T)
+# SC_daily2 <- merge(SC_daily2, SC_daily_violations %>% select(stop_date, driver_race, model1_2_predictions), by = c("stop_date", "driver_race"), all.x = T)
+# 
+# SC_daily2 <- merge(SC_daily2, SC_daily_violations %>% select(stop_date, driver_race, model1_2_exp_preds), by = c("stop_date", "driver_race"), all.x = T)
+# SC_daily2 <- merge(SC_daily2, SC_daily_violations %>% select(stop_date, driver_race, model1_2_exp2_preds), by = c("stop_date", "driver_race"), all.x = T)
+
+SC_daily2 <- merge(SC_daily2, SC_dailyv_referent %>% 
+                     select(stop_date, driver_race, referent_predict) %>%
+                     mutate(stop_purpose = "Violation Observed"), 
+                   by = c("stop_date", "driver_race", "stop_purpose"), all.x = T)
+
+table(is.na(SC_daily2$referent_predict))
+
+SC_daily2 <- merge(SC_daily2, SC_dailysp_referent %>% 
+                     select(stop_date, driver_race, referent_predict) %>%
+                     mutate(stop_purpose = "Radar Triggered"), 
+                   by = c("stop_date", "driver_race", "stop_purpose"), all.x = T)
+
+SC_daily2$date2 <- as.Date(SC_daily2$stop_date, "%Y-%m-%d")
+
+SC_daily2$stop_purpose2 <- fct_relevel(SC_daily2$stop_purpose, "Violation Observed", "Radar Triggered")
+
+figure_1 <- ggplot(SC_daily2, aes(x = date2, y = referent_predict.x)) + 
+  facet_wrap(race ~ stop_purpose2, scales = "free_y", ncol=2) +
+  geom_point(aes(y = daily_num_stops, col = dangerous_days2, pch = fri_sat)) +
+  geom_line(lwd = 1.5, col = "#505050") +
+  geom_line(aes(y = referent_predict.y), col = "#505050", lwd = 1.5) + #c500ff
+  geom_vline(xintercept = as.Date("2005-12-09"), lty = 2) +
+  theme_minimal(base_size = 14) +
+  theme(legend.title = element_blank(), #legend.position = "bottom" #,
+        axis.text.x=element_text(angle=30, hjust=1)
+        ) +
+  scale_shape_manual(values = c(20, 4)) +
+  scale_color_manual(na.value = "grey",
+                     breaks = c("New Year's", "Day after St. Patrick's",
+                                "Independence day", "Labor Day weekend",
+                                "Thanksgiving weekend"),
+                     values = c('#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854')) +
+  labs(y = "Number of stops", x = "") #+
+  #scale_x_date(date_breaks = "4 month", date_labels =  "%b %Y")
+
+# ggplot(SC_daily2 %>% filter(stop_purpose == "Radar Triggered"), aes(x = day_counter, y = model1_3_predictions)) + 
+#   geom_line(col = "#c500ff", lwd = 0.5) + 
+#   facet_grid(race ~ ., scales = "free_y") + 
+#   geom_point(aes(y = daily_num_stops, col = dangerous_days2, pch = fri_sat)) +
+#   geom_vline(xintercept = 343, lty = 2) +
+#   labs(title = "Observed (points) vs. predicted (pink line) number of stops for stops for speeding")
+# 
+# ggplot(SC_daily2 %>% filter(stop_purpose == "Violation Observed"), aes(x = day_counter, y = model1_2_predictions)) + 
+#   geom_line(col = "#c500ff", lwd = 0.5) + 
+#   #geom_line(aes(y = model1_2_exp_preds), col = "blue", lwd = 0.5) + 
+#   geom_line(aes(y = model1_2_exp2_preds), col = "blue", lwd = 0.5) +
+#   facet_grid(race ~ ., scales = "free_y") + 
+#   geom_point(aes(y = daily_num_stops, col = dangerous_days2, pch = fri_sat)) +
+#   geom_vline(xintercept = 343, lty = 2) +
+#   labs(title = "Observed (points) vs. predicted (pink line) number of stops for stops for violations observed")
+
+# figure_3 <- ggplot(SC_daily2, aes(x = day_counter, y = daily_num_stops)) +
+#   #geom_smooth(data = SC_daily2 %>% filter(stop_date < "2005-12-09"), method = lm, formula = y ~ splines::bs(x, 3)) + 
+#   #geom_smooth(data = SC_daily2 %>% filter(stop_date > "2005-12-09"), method = lm, formula = y ~ splines::bs(x, 3)) + 
+#   geom_vline(xintercept = 343, lty = 2) + 
+#   geom_point(aes(col = dangerous_days2, pch = fri_sat)) + 
+#   scale_shape_manual(values = c(20, 4)) + labs(x = "Date", y = "Daily number of traffic stops") +
+#   theme_minimal(base_size = 14) + 
+#   scale_color_manual(na.value = "black",
+#                      breaks = c("New Year's", "Day after St. Patrick's",
+#                                 "Independence day", "Labor Day weekend",
+#                                 "Thanksgiving weekend"),
+#                      values = c('#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854')) +
+#   theme(legend.title = element_blank(), legend.position = "bottom") +
+#   #geom_text(aes(x = 420, y = 2500), label = "Seat belt policy change", check_overlap = T) +
+#   facet_wrap(race ~ stop_purpose, scales = "free_y", ncol=2)
+```
+
+```{r, echo=F, fig.height=11, fig.width=9, warning=F}
+figure_1
+
+ggsave(plot = figure_1, 
+       filename = here("Images","Time-trend-by-race-purpose.png"),
+       width = 30, height = 27, device = "png", units = "cm", dpi = 700)
+```
+
+**Figure 1 Caption:** Stops for “Violation Observed” encapsulated the majority of non-speeding 
+violations such as not wearing a seat belt, failing to stop at a red light, 
+crossing the center line into oncoming traffic, and so on. Stops for “Radar 
+Triggered” included all stops for breaking the speed limit. Each point is the
+number of stops for a specific day. The dashed vertical line indicates the day 
+of the change from secondary to primary enforcement of seat belt use. The solid
+line is the predicted line from the quasi-Poisson model, with the “day” 
+covariate set to Wednesday (the day with a near-average number of stops) and the
+indicators for holidays held at 0 to illustrate the expected number of stops 
+over time for an average day after accounting for month, race, the policy change,
+and the interaction between race and policy.
+
+##### page break
+
+**Figure 2: Estimated additional relative increase and 95% confidence intervals
+for the number of traffic stops for Black and Hispanic drivers following the 
+upgrade to primary seatbelt enforcement, compared to White drivers, according to
+stop purpose**
+
+```{r plot-compare-numstops, echo=F, fig.width=8.66, fig.height=3, warning=F}
+model1_for_plot <- tibble::tibble(race = c(rep("White", 2), rep("Black", 2), rep("Hispanic", 2)), 
+                                  model = rep(c("Violation observed", "Radar triggered"), 3),
+                                  exp_estimate = c(rep(1, 2), results_1b$t0[10], results_1c$t0[10], results_1b$t0[11], results_1c$t0[11]),
+                                  lower_CI = c(rep(1, 2), lcl_bw_1b, lcl_bw_1c, lcl_hw_1b, lcl_hw_1c),
+                                  upper_CI = c(rep(1, 2), ucl_bw_1b, ucl_bw_1c, ucl_hw_1b, ucl_hw_1c)
+)
+
+model1_for_plot %<>% 
+  mutate(race = fct_relevel(race, "White", "Black", "Hispanic"),
+         stop_purpose = fct_relevel(model, "Violation observed", "Radar triggered")) 
+
+rr_model1_plot <- ggplot(model1_for_plot, aes(y = exp_estimate, x = race)) + 
+  geom_hline(yintercept = 1, lty = 2) +
+  geom_errorbar(aes(ymin = lower_CI, ymax = upper_CI), width = 0.1) +
+  geom_point(aes(fill = race), size = 4, pch = 21) + 
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) + 
+  facet_wrap(~ stop_purpose) + 
+  theme_bw() + 
+  theme(legend.position = "none", 
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10)) +
+  labs(y = "Risk ratio (95% CI)", x = "") + 
+  scale_y_log10(breaks = c(0.9, 1, 1.1, 1.2, 1.3), labels = c(0.9, 1.0, 1.1, 1.2, 1.3)) 
+
+rr_model1_plot
+
+ggsave(plot = rr_model1_plot, 
+       filename = here("Images","RR_model1.png"),
+       width = 30, height = 15, device = "png", units = "cm", dpi = 700)
+```
+
+**Figure 2 caption:** This plot displays the marginal risk ratios for the additional
+relative increase to the number of stops among Black and Hispanic drivers 
+compared to White drivers, after the policy enactment, stratified by stop type. These risk ratios were 
+computed using marginal prediction and the confidence intervals calculated using
+the percentile bootstrap method based on 1,000 replicates. Stops for “Violation 
+observed” included the majority of non-speeding 
+violations such as not wearing a seat belt, failing to stop at a red light, 
+etc. Stops for “Radar triggered” included all stops for breaking the speed limit.
+
+##### page break
+
+```{r plot-compare-rr-arrest-models, echo=F, fig.width=8.66, fig.height=3}
+model2_for_plot <- tibble::tibble(race = c(rep("White", 2), rep("Black", 2), rep("Hispanic", 2)), 
+                                  model = rep(c("Violation observed", "Radar triggered"), 3),
+                                  exp_estimate = c(rep(1, 2), results_2b$t0[10], results_2c$t0[10], results_2b$t0[11], results_2c$t0[11]),
+                                  lower_CI = c(rep(1, 2), lcl_bw_2b, lcl_bw_2c, lcl_hw_2b, lcl_hw_2c),
+                                  upper_CI = c(rep(1, 2), ucl_bw_2b, ucl_bw_2c, ucl_hw_2b, ucl_hw_2c)
+)
+
+model2_for_plot <- model2_for_plot %>%
+  mutate(race = forcats::fct_relevel(race, "White", "Black", "Hispanic"),
+         stop_purpose = fct_relevel(model, "All stops", "Violation observed",
+                                    "Radar triggered"))
+
+rr_model2_plot <- ggplot(model2_for_plot, aes(y = exp_estimate, x = race)) + 
+  geom_hline(yintercept = 1, lty = 2) +
+  geom_errorbar(aes(ymin = lower_CI, ymax = upper_CI), width = 0.1) +
+  geom_point(aes(fill = race), size = 4, pch = 21) + 
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) + 
+  facet_wrap(~ stop_purpose) + 
+  theme_bw() + 
+  theme(legend.position = "none", 
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10)) +
+  labs(y = "Risk ratio (95% CI)", x = "") + scale_y_log10(breaks = seq(0.8, 2.0, 0.2), labels = seq(0.8, 2.0, 0.2))
+  #scale_y_continuous(limits = c(0.75, 2))
+
+ggsave(plot = rr_model2_plot, 
+       filename = here("Images","RR_model2.png"),
+       width = 30, height = 15, device = "png", units = "cm", dpi = 700)
+```
+
+```{r plot-compare-rr-search-models, echo=F, fig.width=9, fig.height=4}
+model3_for_plot <- tibble::tibble(race = c(rep("White", 2), rep("Black", 2), rep("Hispanic", 2)), 
+                                  model = rep(c("Violation observed", "Radar triggered"), 3),
+                                  exp_estimate = c(rep(1, 2), results_3b$t0[10], results_3c$t0[10], results_3b$t0[11], results_3c$t0[11]),
+                                  lower_CI = c(rep(1, 2), lcl_bw_3b, lcl_bw_3c, lcl_hw_3b, lcl_hw_3c),
+                                  upper_CI = c(rep(1, 2), ucl_bw_3b, ucl_bw_3c, ucl_hw_3b, ucl_hw_3c)
+)
+
+model3_for_plot <- model3_for_plot %>%
+  mutate(race = forcats::fct_relevel(race, "White", "Black", "Hispanic"),
+         stop_purpose = fct_relevel(model, "Violation observed","Radar triggered"))
+
+rr_model3_plot <- ggplot(model3_for_plot, aes(y = exp_estimate, x = race)) + 
+  geom_hline(yintercept = 1, lty = 2) +
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) + 
+  geom_errorbar(aes(ymin = lower_CI, ymax = upper_CI), width = 0.1) +
+  geom_point(aes(fill = race), size = 4, pch = 21) +
+  facet_wrap(~ stop_purpose) + 
+  theme_bw() + 
+  theme(legend.position = "none", 
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10)) +
+  labs(y = "Risk ratio (95% CI)", x = "") + 
+  scale_y_log10(breaks = seq(0.8, 2, 0.2), limits = c(0.8, 2))
+
+ggsave(plot = rr_model3_plot, 
+       filename = here("Images","RR_model3.png"),
+       width = 30, height = 15, device = "png", units = "cm", dpi = 700)
+```
+
+```{r, echo=F, fig.width = 8.66, fig.height = 5.51, dpi=700}
+means_both <- SC_for_analysis %>% 
+  filter(stop_purpose %in% c("Violation Observed", "Radar Triggered")) %>% 
+  group_by(race, post_policy) %>%
+  summarise(n = n(), 
+            arrest_rate = mean(arrest),
+            arrest_count = sum(arrest),
+            search_rate = mean(search_conducted),
+            search_count = sum(search_conducted))
+
+# aggregated arrest rate CIs
+means_both2 <- means_both %>% 
+  rowwise %>%
+  mutate(tst = list(broom::tidy(prop.test(arrest_count, n, conf.level = 0.95)))) %>%
+  tidyr::unnest(tst) %>%
+  select(-method, -alternative, -parameter, -p.value, -statistic) %>%
+  rename(est_arrest = estimate, lcl_arrest = conf.low, ucl_arrest = conf.high)
+
+# aggregated search rate CIs
+means_both2 <- means_both2 %>% 
+  rowwise %>%
+  mutate(tst = list(broom::tidy(prop.test(search_count, n, conf.level = 0.95)))) %>%
+  tidyr::unnest(tst) %>%
+  select(-method, -alternative, -parameter, -p.value, -statistic) %>%
+  rename(est_search = estimate, lcl_search = conf.low, ucl_search = conf.high)
+
+means_both2 %<>% mutate(stop_purpose = "All Stops")
+
+means <- SC_for_analysis %>% 
+  filter(stop_purpose %in% c("Violation Observed", "Radar Triggered")) %>% 
+  group_by(race, stop_purpose, post_policy) %>%
+  summarise(n = n(), 
+            arrest_rate = mean(arrest),
+            arrest_count = sum(arrest),
+            search_rate = mean(search_conducted),
+            search_count = sum(search_conducted))
+
+# arrest rate CIs
+means2 <- means %>% 
+  rowwise %>%
+  mutate(tst = list(broom::tidy(prop.test(arrest_count, n, conf.level = 0.95)))) %>%
+  tidyr::unnest(tst) %>%
+  select(-method, -alternative, -parameter, -p.value, -statistic) %>%
+  rename(est_arrest = estimate, lcl_arrest = conf.low, ucl_arrest = conf.high)
+
+# search rate CIs
+means2 <- means2 %>% 
+  rowwise %>%
+  mutate(tst = list(broom::tidy(prop.test(search_count, n, conf.level = 0.95)))) %>%
+  tidyr::unnest(tst) %>%
+  select(-method, -alternative, -parameter, -p.value, -statistic) %>%
+  rename(est_search = estimate, lcl_search = conf.low, ucl_search = conf.high)
+
+means3 <- rbind(means_both2, means2)
+
+# prepare for plotting
+means3 %<>% mutate(race_policy = interaction(race, post_policy), 
+                   race_policy = fct_relevel(race_policy, 
+                                             "White.0", 
+                                             "White.1", 
+                                             "Black.0",
+                                             "Black.1", 
+                                             "Hispanic.0", 
+                                             "Hispanic.1"),
+                   post_policy_i = case_when(post_policy == 0 ~ "Secondary enforcement",
+                                             post_policy == 1 ~ "Primary enforcement"),
+                   post_policy_i = fct_relevel(post_policy_i, "Secondary enforcement"),
+                   stop_purpose = fct_relevel(stop_purpose, "All Stops", "Violation Observed", "Radar Triggered")
+                   )
+
+figure_4a <- ggplot(means3 %>% filter(stop_purpose != "All Stops"), aes(x = race_policy, y = est_arrest)) +
+  geom_segment(aes(xend = race_policy, y = lcl_arrest, yend = ucl_arrest)) +
+  geom_point(aes(fill = race), pch = 21, size = 4) + scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) + 
+  facet_wrap(~ stop_purpose) + scale_y_continuous(labels = scales::percent, limits = c(0, 0.1)) + 
+  labs(y = "Arrest rate", x = "") + 
+  theme_bw() + 
+  theme(legend.title = element_blank(), legend.position = "top",
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12)) +
+  scale_x_discrete(labels = rep(c("before", "after"), 3))
+```
+
+```{r marginal_model2, echo=F}
+model2_absolutes <- tibble::tibble(race = c(rep("White", 2), rep("Black", 2), rep("Hispanic", 2), rep("White", 2), rep("Black", 2), rep("Hispanic", 2)), 
+                                  post_policy = rep(c(0, 1), 6),
+                                  stop_purpose = c(rep("Violation Observed", 6), rep("Radar Triggered", 6)),
+                                  est_arrest = c(results_2b$t0[1], results_2b$t0[4], results_2b$t0[2], 
+                                                   results_2b$t0[5], results_2b$t0[3], results_2b$t0[6],
+                                                   results_2c$t0[1], results_2c$t0[4], results_2c$t0[2], 
+                                                   results_2c$t0[5], results_2c$t0[3], results_2c$t0[6]),
+                                  lower_CI = c(boot.ci(results_2b, type = "perc", index = 1)$percent[4], 
+                                               boot.ci(results_2b, type = "perc", index = 4)$percent[4], 
+                                               boot.ci(results_2b, type = "perc", index = 2)$percent[4], 
+                                               boot.ci(results_2b, type = "perc", index = 5)$percent[4], 
+                                               boot.ci(results_2b, type = "perc", index = 3)$percent[4], 
+                                               boot.ci(results_2b, type = "perc", index = 6)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 1)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 4)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 2)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 5)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 3)$percent[4], 
+                                               boot.ci(results_2c, type = "perc", index = 6)$percent[4] 
+                                               ),
+                                  upper_CI = c(boot.ci(results_2b, type = "perc", index = 1)$percent[5], 
+                                               boot.ci(results_2b, type = "perc", index = 4)$percent[5], 
+                                               boot.ci(results_2b, type = "perc", index = 2)$percent[5], 
+                                               boot.ci(results_2b, type = "perc", index = 5)$percent[5], 
+                                               boot.ci(results_2b, type = "perc", index = 3)$percent[5], 
+                                               boot.ci(results_2b, type = "perc", index = 6)$percent[5],
+                                               boot.ci(results_2c, type = "perc", index = 1)$percent[5], 
+                                               boot.ci(results_2c, type = "perc", index = 4)$percent[5], 
+                                               boot.ci(results_2c, type = "perc", index = 2)$percent[5], 
+                                               boot.ci(results_2c, type = "perc", index = 5)$percent[5], 
+                                               boot.ci(results_2c, type = "perc", index = 3)$percent[5], 
+                                               boot.ci(results_2c, type = "perc", index = 6)$percent[5] 
+                                               )
+)
+
+model2_absolutes %<>% mutate(race_policy = interaction(race, post_policy),
+                             race = forcats::fct_relevel(race, "White", "Black", "Hispanic"),
+                   race_policy = fct_relevel(race_policy, 
+                                             "White.0", 
+                                             "White.1", 
+                                             "Black.0",
+                                             "Black.1", 
+                                             "Hispanic.0", 
+                                             "Hispanic.1"),
+                   post_policy_i = case_when(post_policy == 0 ~ "Secondary enforcement",
+                                             post_policy == 1 ~ "Primary enforcement"),
+                   post_policy_i = fct_relevel(post_policy_i, "Secondary enforcement"),
+                   stop_purpose = fct_relevel(stop_purpose, "Violation Observed", "Radar Triggered")
+)
+
+
+figure_4a_bs <- ggplot(model2_absolutes, aes(x = race_policy, y = est_arrest)) +
+  geom_segment(aes(xend = race_policy, y = lower_CI, yend = upper_CI)) +
+  geom_point(aes(fill = race), size = 4, pch = 21) + 
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) +
+  facet_wrap(~ stop_purpose) + scale_y_continuous(labels = scales::percent, limits = c(0, 0.1)) + 
+  labs(y = "Arrest rate", x = "") + 
+  theme_bw() + 
+  theme(legend.position = "top", legend.title = element_blank(),
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10)) +
+  scale_x_discrete(labels = rep(c("before", "after"), 3))
+```
+
+**Figure 3: Estimated additional relative increase (risk ratios) and 95% 
+confidence intervals for the arrest rates for Black and Hispanic drivers 
+following the upgrade to primary seatbelt enforcement, compared to White 
+drivers, according to stop purpose**
+
+```{r plot-rates-arrest-alternative, echo=F, fig.width = 7.66, fig.height = 5.51, dpi=700}
+arrest_rates_plot <- figure_4a + rr_model2_plot + plot_layout(nrow = 2)
+arrest_rates_plot
+
+ggsave(plot = arrest_rates_plot, filename = here("Images", "Arrest-rates-and-RRs.png"),
+       width = 22, height = 14, device = "png", units = "cm", dpi = 700)
+```
+
+**Figure 3 caption:** This plot displays the marginal risk ratios for the additional
+relative increase to the risk of arrest among Black and Hispanic drivers 
+compared to White drivers, after the policy enactment, stratified by stop type.
+These risk ratios were computed using marginal prediction and the confidence 
+intervals calculated using the percentile bootstrap method based on 1,000 
+replicates. Stops for “Violation 
+observed” encapsulated the majority of non-speeding 
+violations such as not wearing a seat belt, failing to stop at a red light, 
+crossing the center line into oncoming traffic, and so on. Stops for “Radar 
+triggered” included all stops for breaking the speed limit.
+
+##### page break
+
+```{r marginal_model3, echo=F}
+model3_absolutes <- tibble::tibble(race = c(rep("White", 2), rep("Black", 2), rep("Hispanic", 2), rep("White", 2), rep("Black", 2), rep("Hispanic", 2)), 
+                                  post_policy = rep(c(0, 1), 6),
+                                  stop_purpose = c(rep("Violation Observed", 6), rep("Radar Triggered", 6)),
+                                  est_arrest = c(results_3b$t0[1], results_3b$t0[4], results_3b$t0[2], 
+                                                   results_3b$t0[5], results_3b$t0[3], results_3b$t0[6],
+                                                   results_3c$t0[1], results_3c$t0[4], results_3c$t0[2], 
+                                                   results_3c$t0[5], results_3c$t0[3], results_3c$t0[6]),
+                                  lower_CI = c(boot.ci(results_3b, type = "perc", index = 1)$percent[4], 
+                                               boot.ci(results_3b, type = "perc", index = 4)$percent[4], 
+                                               boot.ci(results_3b, type = "perc", index = 2)$percent[4], 
+                                               boot.ci(results_3b, type = "perc", index = 5)$percent[4], 
+                                               boot.ci(results_3b, type = "perc", index = 3)$percent[4], 
+                                               boot.ci(results_3b, type = "perc", index = 6)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 1)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 4)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 2)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 5)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 3)$percent[4], 
+                                               boot.ci(results_3c, type = "perc", index = 6)$percent[4] 
+                                               ),
+                                  upper_CI = c(boot.ci(results_3b, type = "perc", index = 1)$percent[5], 
+                                               boot.ci(results_3b, type = "perc", index = 4)$percent[5], 
+                                               boot.ci(results_3b, type = "perc", index = 2)$percent[5], 
+                                               boot.ci(results_3b, type = "perc", index = 5)$percent[5], 
+                                               boot.ci(results_3b, type = "perc", index = 3)$percent[5], 
+                                               boot.ci(results_3b, type = "perc", index = 6)$percent[5],
+                                               boot.ci(results_3c, type = "perc", index = 1)$percent[5], 
+                                               boot.ci(results_3c, type = "perc", index = 4)$percent[5], 
+                                               boot.ci(results_3c, type = "perc", index = 2)$percent[5], 
+                                               boot.ci(results_3c, type = "perc", index = 5)$percent[5], 
+                                               boot.ci(results_3c, type = "perc", index = 3)$percent[5], 
+                                               boot.ci(results_3c, type = "perc", index = 6)$percent[5] 
+                                               )
+)
+
+model3_absolutes %<>% mutate(race_policy = interaction(race, post_policy),
+                             race = forcats::fct_relevel(race, "White", "Black", "Hispanic"),
+                   race_policy = fct_relevel(race_policy, 
+                                             "White.0", 
+                                             "White.1", 
+                                             "Black.0",
+                                             "Black.1", 
+                                             "Hispanic.0", 
+                                             "Hispanic.1"),
+                   post_policy_i = case_when(post_policy == 0 ~ "Secondary enforcement",
+                                             post_policy == 1 ~ "Primary enforcement"),
+                   post_policy_i = fct_relevel(post_policy_i, "Secondary enforcement"),
+                   stop_purpose = fct_relevel(stop_purpose, "Violation Observed", "Radar Triggered")
+)
+
+
+figure_5a_bs <- ggplot(model3_absolutes, aes(x = race_policy, y = est_arrest)) +
+  geom_segment(aes(xend = race_policy, y = lower_CI, yend = upper_CI)) +
+  geom_point(aes(fill = race), pch = 21, size = 4) +
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) +
+  facet_wrap(~ stop_purpose) + scale_y_continuous(labels = scales::percent, limits = c(0, 0.1)) + 
+  labs(y = "Arrest rate", x = "") + 
+  theme_bw() + 
+  theme(legend.position = "top", legend.title = element_blank(),
+        strip.background = element_rect(fill = "white"), 
+        strip.text = element_text(size = 12),
+        axis.text = element_text(size = 10)) +
+  scale_x_discrete(labels = rep(c("before", "after"), 3))
+```
+##### page break
+
+**Figure 4: Estimated additional relative increase (risk ratios) and 95% 
+confidence intervals for the search rates for Black and Hispanic drivers 
+following the upgrade to primary seatbelt enforcement, compared to White 
+drivers, according to stop purpose**
+
+```{r plot-rates-search, echo=F, fig.width = 7.66, fig.height = 3, dpi=700}
+figure_5a <- ggplot(means3 %>% filter(stop_purpose != "All Stops"), aes(x = race_policy, y = est_search)) +
+  geom_segment(aes(xend = race_policy, y = lcl_search, yend = ucl_search)) +
+  geom_point(aes(fill = race), pch = 21, size = 4) +
+  scale_fill_manual(values = c("#440154", "#218F8B", "#FDE725")) +
+  facet_wrap(~stop_purpose) + scale_y_continuous(labels = scales::percent, limits = c(0, 0.1)) + 
+  labs(y = "Search rate", x = "") + 
+  theme_bw() + theme(legend.title = element_blank(), legend.position = 'top', 
+                     strip.background = element_rect(fill = "white"), 
+                     strip.text = element_text(size = 12)
+                     ) +
+  scale_x_discrete(labels = rep(c("before", "after"), 3))
+```
+
+```{r plot-rates-search-alternative, echo=F, fig.width =7.66, fig.height = 5.51, dpi=700}
+search_rates_plot <- figure_5a + rr_model2_plot + plot_layout(nrow = 2)
+search_rates_plot
+
+ggsave(plot = search_rates_plot, filename = here("Images", "Search-rates-and-RRs.png"),
+       width = 22, height = 14, device = "png", units = "cm", dpi = 700)
+```
+
+**Figure 4 caption:** This plot displays the marginal risk ratios for the additional
+relative increase to the risk of search among Black and Hispanic drivers 
+compared to White drivers, after the policy enactment, stratified by stop type.
+These risk ratios were computed using marginal prediction and the confidence 
+intervals calculated using the percentile bootstrap method based on 1,000 
+replicates. Stops for “Violation 
+observed” encapsulated the majority of non-speeding 
+violations such as not wearing a seat belt, failing to stop at a red light, 
+crossing the center line into oncoming traffic, and so on. Stops for “Radar 
+triggered” included all stops for breaking the speed limit.
+
+##### pb
+
+# Supplementary appendix to “Using change in a seat belt law to study racially-biased policing in South Carolina”
+
+Corinne A. Riddell,  Jay S. Kaufman, Jacqueline M. Torres, Sam Harper
+
+**Contents:** 
+
+Table S1: Quasi-Poisson regression of the number of daily traffic stops in South Carolina by highway traffic patrol to drivers with observed violations, 2005-2006
+
+Table S2: Quasi-Poisson regression of the number of daily traffic stops in South Carolina by highway traffic patrol to speeding drivers, 2005-2006
+
+Table S3: Logistic regression of arrests in South Carolina by the highway traffic patrol among stops for observed violations only, 2005-2006
+
+Table S4: Logistic regression of arrests in South Carolina by the highway traffic patrol among stops for speeding, 2005-2006
+
+Table S5: Logistic regression of searches conducted in South Carolina by the highway traffic patrol among stops for observed violations only, 2005-2006
+
+Table S6: Logistic regression of searches conducted in South Carolina by the highway traffic patrol among stops for speeding, 2005-2006
+
+##### page break
+
+```{r load-data, echo=F}
+load(here("Data", "Aggregated-data-05-12.Rdata")) # this puts summary 1 into the environment
+```
+
+##### page break
+
+**Table S1: Quasi-Poisson regression of the number of daily traffic stops in South Carolina by highway traffic patrol to drivers with observed violations, 2005-2006**
+
+```{r, echo=F}
+model1_2_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated RR*` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" | substr(Term, 1, 2) == "ns" ~ NA_real_,
+                              Term != "(Intercept)" & ! (substr(Term, 1, 2) == "ns") ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+  round_df(2) %>%
+  mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic", 
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month2" ~"February (ref: January)", 
+                          Term == "month3" ~"March", 
+                          Term == "month4" ~"April", 
+                          Term == "month5" ~"May", 
+                          Term == "month6" ~"June", 
+                          Term == "month7" ~"July",
+                          Term == "month8" ~"August",
+                          Term == "month9" ~"September",
+                          Term == "month10" ~"October", 
+                          Term == "month11" ~"November", 
+                          Term == "month12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dangerous_daysDay after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dangerous_daysIndependence day" ~"Independence Day", 
+                          Term == "dangerous_daysLabor Day weekend" ~"Labor Day weekend", 
+                          Term == "dangerous_daysNew Year's" ~"New Year's", 
+                          Term == "dangerous_daysThanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  kable()
+```
+
+* The Estimated Relative Risk (RR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+##### page break
+
+**Table S2: Quasi-Poisson regression of the number of daily traffic stops in South Carolina by highway traffic patrol to speeding drivers, 2005-2006**
+
+```{r, echo=F}
+model1_3_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated RR` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" | substr(Term, 1, 2) == "ns" ~ NA_real_,
+                              Term != "(Intercept)" & ! (substr(Term, 1, 2) == "ns") ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+  round_df(2) %>%
+  mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic", 
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month2" ~"February (ref: January)", 
+                          Term == "month3" ~"March", 
+                          Term == "month4" ~"April", 
+                          Term == "month5" ~"May", 
+                          Term == "month6" ~"June", 
+                          Term == "month7" ~"July",
+                          Term == "month8" ~"August",
+                          Term == "month9" ~"September",
+                          Term == "month10" ~"October", 
+                          Term == "month11" ~"November", 
+                          Term == "month12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dangerous_daysDay after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dangerous_daysIndependence day" ~"Independence Day", 
+                          Term == "dangerous_daysLabor Day weekend" ~"Labor Day weekend", 
+                          Term == "dangerous_daysNew Year's" ~"New Year's", 
+                          Term == "dangerous_daysThanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  kable()
+```
+
+* The Estimated Relative Risk (RR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+##### page break
+
+**Table S3: Logistic regression of arrests in South Carolina by the highway traffic patrol among stops for observed violations only, 2005-2006**
+
+```{r, echo=F}
+model2b_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated OR*` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+  round_df(2) %>%
+  mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic",
+                          Term == "driver_genderM" ~ "Male (ref: Female)",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))1" ~ "Age spline term: <20 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))2" ~ "Age spline term: 20-30 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))3" ~ "Age spline term: 30-40 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))4" ~ "Age spline term: 40-50 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))5" ~ "Age spline term: 50-60 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))6" ~ "Age spline term: >60 years",
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month_i2" ~"February (ref: January)", 
+                          Term == "month_i3" ~"March", 
+                          Term == "month_i4" ~"April", 
+                          Term == "month_i5" ~"May", 
+                          Term == "month_i6" ~"June", 
+                          Term == "month_i7" ~"July",
+                          Term == "month_i8" ~"August",
+                          Term == "month_i9" ~"September",
+                          Term == "month_i10" ~"October", 
+                          Term == "month_i11" ~"November", 
+                          Term == "month_i12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dangerous_daysDay after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dangerous_daysIndependence day" ~"Independence Day", 
+                          Term == "dangerous_daysLabor Day weekend" ~"Labor Day weekend", 
+                          Term == "dangerous_daysNew Year's" ~"New Year's", 
+                          Term == "dangerous_daysThanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  kable()
+```
+
+* The Estimated Odds Ratio (OR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+##### page break
+
+**Table S4: Logistic regression of arrests in South Carolina by the highway traffic patrol among stops for speeding, 2005-2006**
+
+```{r, echo=F}
+model2c_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated OR*` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+      mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic",
+                          Term == "driver_genderM" ~ "Male (ref: Female)",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))1" ~ "Age spline term: <20 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))2" ~ "Age spline term: 20-30 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))3" ~ "Age spline term: 30-40 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))4" ~ "Age spline term: 40-50 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))5" ~ "Age spline term: 50-60 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))6" ~ "Age spline term: >60 years",
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month_i2" ~"February (ref: January)", 
+                          Term == "month_i3" ~"March", 
+                          Term == "month_i4" ~"April", 
+                          Term == "month_i5" ~"May", 
+                          Term == "month_i6" ~"June", 
+                          Term == "month_i7" ~"July",
+                          Term == "month_i8" ~"August",
+                          Term == "month_i9" ~"September",
+                          Term == "month_i10" ~"October", 
+                          Term == "month_i11" ~"November", 
+                          Term == "month_i12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dang_days2Day after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dang_days2Labor Day weekend" ~"Labor Day weekend", 
+                          Term == "dang_days2New Year's" ~"New Year's", 
+                          Term == "dang_days2Thanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  round_df(2) %>%
+  kable()
+```
+
+* The Estimated Odds Ratio (OR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+This model does not include an indicator variable for Independence day.
+This is because there are no arrests among stops for speeding on this day, so 
+it could not be included in this model.
+
+##### page break
+
+**Table S5: Logistic regression of searches conducted in South Carolina by the highway traffic patrol among stops for observed violations only, 2005-2006**
+
+```{r, echo=F}
+model3b_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated OR*` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+  mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic",
+                          Term == "driver_genderM" ~ "Male (ref: Female)",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))1" ~ "Age spline term: <20 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))2" ~ "Age spline term: 20-30 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))3" ~ "Age spline term: 30-40 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))4" ~ "Age spline term: 40-50 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))5" ~ "Age spline term: 50-60 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))6" ~ "Age spline term: >60 years",
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month_i2" ~"February (ref: January)", 
+                          Term == "month_i3" ~"March", 
+                          Term == "month_i4" ~"April", 
+                          Term == "month_i5" ~"May", 
+                          Term == "month_i6" ~"June", 
+                          Term == "month_i7" ~"July",
+                          Term == "month_i8" ~"August",
+                          Term == "month_i9" ~"September",
+                          Term == "month_i10" ~"October", 
+                          Term == "month_i11" ~"November", 
+                          Term == "month_i12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dangerous_daysDay after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dangerous_daysIndependence day" ~"Independence Day", 
+                          Term == "dangerous_daysLabor Day weekend" ~"Labor Day weekend", 
+                          Term == "dangerous_daysNew Year's" ~"New Year's", 
+                          Term == "dangerous_daysThanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  round_df(2) %>%
+  kable()
+```
+
+* The Estimated Odds Ratio (OR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+##### page break
+
+**Table S6: Logistic regression of searches conducted in South Carolina by the highway traffic patrol among stops for speeding, 2005-2006**
+
+```{r, echo=F}
+model3c_results %>% 
+  select(term, estimate, exp_estimate, lower_CI, upper_CI) %>%
+  rename(Term = term, Estimate = estimate, `Estimated OR*` = exp_estimate,
+         `lower CI` = lower_CI, `upper CI` = upper_CI) %>%
+  mutate(`lower CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `lower CI`),
+         `upper CI` = case_when(Term == "(Intercept)" ~ NA_real_,
+                              Term != "(Intercept)" ~ `upper CI`)) %>%
+  round_df(2) %>%
+  mutate(Term = case_when(Term == "(Intercept)" ~ "Intercept",
+                          Term == "raceBlack" ~ "Black (ref: White)",
+                          Term == "raceHispanic" ~"Hispanic",
+                          Term == "driver_genderM" ~ "Male (ref: Female)",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))1" ~ "Age spline term: <20 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))2" ~ "Age spline term: 20-30 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))3" ~ "Age spline term: 30-40 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))4" ~ "Age spline term: 40-50 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))5" ~ "Age spline term: 50-60 years",
+                          Term == "ns(driver_age, knots = c(20, 30, 40, 50, 60))6" ~ "Age spline term: >60 years",
+                          Term == "post_policy" ~ "post policy", 
+                          Term == "month_i2" ~"February (ref: January)", 
+                          Term == "month_i3" ~"March", 
+                          Term == "month_i4" ~"April", 
+                          Term == "month_i5" ~"May", 
+                          Term == "month_i6" ~"June", 
+                          Term == "month_i7" ~"July",
+                          Term == "month_i8" ~"August",
+                          Term == "month_i9" ~"September",
+                          Term == "month_i10" ~"October", 
+                          Term == "month_i11" ~"November", 
+                          Term == "month_i12" ~"December",
+                          Term == "day_of_weekMonday" ~"Monday (ref: Sunday)", 
+                          Term == "day_of_weekTuesday" ~"Tuesday", 
+                          Term == "day_of_weekWednesday" ~"Wednesday", 
+                          Term == "day_of_weekThursday" ~"Thursday",
+                          Term == "day_of_weekFriday" ~"Friday", 
+                          Term == "day_of_weekSaturday" ~"Saturday",
+                          Term == "dangerous_daysDay after St. Patrick's" ~"Day after St. Patrick's Day",
+                          Term == "dangerous_daysIndependence day" ~"Independence Day", 
+                          Term == "dangerous_daysLabor Day weekend" ~"Labor Day weekend", 
+                          Term == "dangerous_daysNew Year's" ~"New Year's", 
+                          Term == "dangerous_daysThanksgiving weekend" ~"Thanksgiving",
+                          Term == "raceBlack:post_policy" ~"Black * policy interaction",
+                          Term == "raceHispanic:post_policy" ~"Hispanic * policy interaction")) %>%
+  kable()
+```
+
+* The Estimated Odds Ratio (OR) shown in this table is the exponentiated 
+coefficient estimate. It is not equal to the estimated RRs reported in the main 
+text, which we calculated using marginal standardization.
+
+

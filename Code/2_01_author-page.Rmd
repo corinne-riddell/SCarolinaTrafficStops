@@ -1,0 +1,33 @@
+---
+title: "2_01_author-page"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output: html_document
+---
+
+Corinne A. Riddell, PhD^1^
+
+Jay S. Kaufman, PhD^2^
+
+Jacqueline M. Torres, PhD^3^
+
+Sam Harper, PhD^2^
+
+1. Department of Epidemiology & Biostatistics, School of Public Health, 
+UC Berkeley, 2121 Berkeley Way West, Berkeley, CA 94704, 
+United States
+
+2. Department of Epidemiology, Biostatistics & Occupational Health, McGill 
+University, 1020 Pine Avenue West, Room 27, Montreal, QC H3A 1A2, Canada.
+
+3. Department of Epidemiology & Biostatistics, UC San Francisco, 550 16th Street,
+San Francisco, CA 94143, USA. 
+
+Address correspondence to: Corinne Riddell, PhD, Department of Epidemiology & 
+Biostatistics, School of Public Health, University of California, Berkeley, 
+2121 Berkeley Way West, Room 5404, Berkeley, CA 94704, United States. 
+Email: <corinne.riddell@berkeley.edu>. Phone: +1-510-642-4618
+
+Manuscript word count: 3362
+
+Abstract word count: 247

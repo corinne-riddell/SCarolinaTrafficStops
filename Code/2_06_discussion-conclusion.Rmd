@@ -1,0 +1,130 @@
+---
+title: "2_06_written-results"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Discussion
+
+```{r, echo=F}
+model1_no_EMM <- glm(formula = daily_num_stops ~ race + post_policy + 
+                month + day_of_week + dangerous_days, 
+                data = SC_daily_violations, family = "quasipoisson")
+
+SC_dailyv_no_EMM <- SC_daily_violations
+SC_dailyv_no_EMM$predict_noEMM <- predict(object = model1_no_EMM, SC_dailyv_no_EMM, type = "response")
+
+SC_dailyv_no_EMM %<>%
+  mutate(diff = model1_2_predictions - predict_noEMM) 
+
+# SC_dailyv_no_EMM%>%
+#   group_by(driver_race, post_policy) %>%
+#   summarize(mean(diff), sum(diff))
+```
+
+The goal of this paper was to investigate whether the enactment of primary 
+enforcement of seat belt policy in South Carolina had differential effects on 
+the number of stops, searches, and arrests for White, Black, and Hispanic 
+drivers. We found that the policy change led to an abrupt increase to the number of
+traffic stops for non-speeding violations. While the number of stops 
+increased by 50% for White drivers, Black drivers were estimated to experience an 
+additional 5% increase above that seen for Whites. This led to 1,931 more stops 
+in the post-policy period for Black drivers relative to what they would have 
+experienced had the size of the increase to 
+Black and White drivers been the same. This observation on its own may not be 
+indicative of differential enforcement, if seat belt use varies by race/ethnicity.
+The closest estimates in time of the difference in seat belt use between Whites and Blacks
+are from the Behavioral Risk Factor Surveillance System (BRFSS) 1995 and 2010 
+versions, about eleven years before and four years after the 
+policy change. Surveyed White respondents used seat belts at slightly higher rates 
+than surveyed Black respondents in South Carolina during both years.^19^ 
+
+Although the seat belt policy increased traffic stops, we were not surprised that the 
+arrest and search rates decreased after its enactment. Stops primarily for
+seat belt violations should not usually result in an arrest or vehicle search. 
+Our analysis indicates that this decrease in the arrest and search rates was 
+larger for Black drivers, as they were estimated to experience an additional 
+15% reduction in arrests and additional 10% reduction in vehicle search beyond 
+what was estimated for White drivers. Taken together with the additional 
+increase to the number of stops of Black drivers compared to White drivers, 
+these results suggest differential enforcement of the seat belt policy for 
+Black and White drivers. 
+
+The findings for Hispanic drivers are more difficult to interpret because the 
+largest effects of the policy were estimated for speeding stops. Given that 
+stops for speeding should not have been affected by the seat belt policy, these
+results raised a concern that a concurrent change may have occurred for Hispanic 
+drivers that did not impact others. One explanation may 
+have been increased collaboration between local law enforcement and federal 
+immigration authorities under the Section 287(g) program. Although Section 287(g)
+was added to the Immigration and Nationality Act in 
+1996---much earlier than the seat belt policy change in South Carolina---90%
+of partnerships betwen local law enforcement agencies and federal immigration 
+authorities were formed in the 2007 and 2008 fiscal years.^20, 21^ While these 
+formations occurred 1-2 years after the seat belt policy change, it is possible 
+that South Carolina began implementing changes in anticipation of a formal 
+partnership. Indeed, a document for their Sheriff's office describes that the 
+state had applied for participation in 287(g) in 2006, though approval was only 
+granted to York county in 2007, and not to other counties because of federal 
+budget constraints.^22^ Further, 2007 data (not included in our analysis) also
+includes the addition of the immigration enforcement unit.^23^ For these 
+reasons, we cannot conclude that the changes observed for Hispanic drivers were
+driven entirely by the seat belt policy change. 
+
+Our results need to be considered alongside what else is known 
+about the effects of seat belt policies on motor vehicle injuries. Historically,
+when seat belt use was lower, switching to primary enforcement was an effective 
+means for increasing seat belt use and decreasing fatalities from vehicle crashes.^16,24^ 
+The most recent states to switch their policies have not experienced the same 
+magnitude of effects on mortality,^4,5^ likely because seat belt use is at an
+all-time high, with all states reporting prevalences of always wearing a seat 
+belt between 67% and 98%  (nationwide average 90%) in 2017 based on 
+observational data.^25^ 
+
+Only a few studies have looked at seat belt policy and discrimination. A study
+conducted by the National Highway Safety Administration found no difference in 
+the proportion of citations issued to minorities when comparing pre-policy to post-policy
+years in four states with data.^6^ On the other hand, the American Civil Liberties 
+Union (ACLU) looked specifically at Florida and found that Black drivers were 
+nearly twice as likely than White drivers to be stopped for a seat belt violation,
+and that this difference varied by county; Black drivers in Escambia, Palm 
+Beach and Orange Counties were 4, 3, and 2.8 times more likely to be stopped and
+ticketed for seat belt violations than White drivers.^7^
+
+Our findings are subject to limitations. These data do not identify which specific
+stops were for seat belt violations, only the broader category of observed violations. The dataset only contained 
+stops conducted by state troopers, not local law enforcement. An investigation 
+by the Los Angeles (LA) Times found that 69% of stops by the sheriff’s office in LA county 
+were to Hispanic drivers compared to 40% of stops by the California Highway 
+Patrol (CHP) and that the search rate for Hispanic drivers was 67% for the 
+sheriff’s office vs. 3% for the CHP.^26^ Thus, our findings may not apply to 
+stops conducted by local law enforcement. We only used data from South Carolina,
+in order to estimate the impact of a policy change. While this may improve this study's
+internal validity, our findings may not generalize to other parts of the United
+States with different historical contexts and racial/ethnic compositions. We did
+not attempt to comment on the
+presence or absence of discrimination based on baseline differences between 
+the number of stops, arrests, and searches across races/ethnicities; we only
+comment on the portion that we think is causally attributable to a policy change. 
+
+This study found that enacting a primary enforcement seat belt law in South
+Carolina led to a larger relative increase in the number of stops to Black 
+drivers beyond that 
+experienced by White drivers, coupled with a larger relative decrease in the arrest and 
+search rates for Black drivers compared to White drivers. The impact on Hispanic
+drivers is more difficult to interpret because of potentially concurrent policy
+changes that enabled local law enforcement to precipitate federal immigration actions with 
+mundane stops, including seat belt violations. Evaluation of how structural
+systems may perpetuate racism are needed, especially policies intended to 
+improve public health that may have unintended consequences or be differentially
+enforced across race and ethnic groups.^27^ 
+
+Funding: This research did not receive any specific grant from funding agencies 
+in the public, commercial, or not-for-profit sectors.
+
+##### page break
+
+

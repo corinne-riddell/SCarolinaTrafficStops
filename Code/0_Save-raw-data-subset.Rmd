@@ -1,0 +1,47 @@
+---
+title: "Import and save the South Carolina highway patrol stops"
+author: "Corinne Riddell"
+date: "January 1, 2019"
+output: html_document
+---
+
+### Reproducibility note
+
+The raw data was downloaded from the Stanford Policing Project's website. 
+Because it is too large to host on GitHub, you will need to download the South 
+Carolina .gz file. You can find South Carolina's data on this 
+page: https://openpolicing.stanford.edu/data/. Then update the pathway on line 
+19 to your pathway to the downloaded file if you want to reproduce the analysis 
+from the very beginning. Otherwise, you can instead work with the intermediate data
+products that we have included on GitHub. 
+
+```{r load-libraries}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r load_data_subset}
+file_SC <- gzfile( "/Volumes/Untitled/Dropbox/Police-Stops/Raw-data/SC-clean.csv.gz" ) 
+
+SC_subset <- read.csv( file_SC, 
+                       stringsAsFactors = FALSE, 
+                       header = T, 
+                       nrows = 6000000 ) #pulls a 6-million-rows subset of the data
+
+table( year(SC_subset$stop_date) ) #years 2005 to 2013
+```
+
+Restrict the subset to the years 2005 to 2012:
+
+```{r restrict-years-2005-12}
+SC_subset <- SC_subset %>% 
+  filter( year(SC_subset$stop_date) %in% c(2005:2012) )
+```
+
+Usually we want to save the data as a .csv, but here we go against that best 
+practice because the saved csv file would exceed 1 GB, which the Rdata file is 126 MB.
+
+```{r save-enhanced-data}
+#readr::write_csv(SC.sample, "../Data/Raw-data-05-12.csv")
+save( SC_subset, file = "/Volumes/Untitled/Dropbox/Police-Stops/Raw-data/Raw-data-05-12.Rdata" )
+```

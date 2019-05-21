@@ -1,0 +1,10 @@
+---
+title: "Abstract"
+output: word_document
+---
+
+## Abstract
+
+Seat belt laws have increased seat belt use in the US and contributed to reduced fatalities and injuries. However, these policies provide the potential for increased discrimination. The objective of this study is to determine whether a change in seat belt use enforcement led to a differential change in the number of stops, arrests, and searches to White, Black and Hispanic drivers in one US state. We used data on 1,091,424 traffic stops conducted by state troopers in South Carolina in 2005 and 2006 to examine how the change from secondary to primary enforcement of seat belt use in December 2005 affected the number of stops, arrests, and searches to White, Black, and Hispanic drivers using quasi-Poisson and logistic regressions. We found that the policy change led to a 50% increase in the number of non-speeding stops for White drivers, and that this increase was 5% larger among Black drivers [RR (95% CI) = 1.05 (1.00, 1.10)], but not larger among Hispanic drivers [1.00 (0.93, 1.08)]. The policy change decreased arrests and searches among non-speeding stops, with larger decreases for Black vs. White drivers [RR searches = 0.86 (0.81, 0.91) and RR arrests = 0.90 (0.85, 0.96)]. For Hispanic drivers, effects of the policy change were also found among stops for speeding, which failed the falsification test and suggested that other changes likely affected this group. These findings may support the hypothesis of differential enforcement of seat belt policy in South Carolina for Black and White drivers.
+
+##### pb

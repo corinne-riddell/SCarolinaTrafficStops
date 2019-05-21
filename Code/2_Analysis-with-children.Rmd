@@ -1,0 +1,55 @@
+---
+title: Using change in a seat belt law to study racially-biased policing in South Carolina 
+output: 
+  word_document:
+    reference_docx: reference.docx  
+---
+  
+```{r, echo=F, warning=F, message=F}
+library(tidyverse)
+library(lubridate)
+library(broom)
+library(glue)
+library(knitr)
+library(splines) #for the ns() function to make a restricted cubic spline
+library(magrittr)
+library(tibble)
+library(modelr)
+library(boot)
+library(beepr)
+library(english)
+library(pals)
+library(patchwork)
+library(here)
+source(here("Code", "99_helper-functions.R"))
+```
+
+```{r include-author-page, child = '2_01_author-page.Rmd'}
+```
+
+##### page break
+
+```{r include-abstract, child = '2_02_abstract.Rmd'}
+```
+
+##### page break
+
+```{r include-introduction, child = '2_03_introduction.Rmd'}
+```
+
+```{r include-methods, child = '2_04_methods.Rmd'}
+```
+
+```{r include-results, child = '2_05_results.Rmd'}
+```
+
+```{r include-results-written, child = '2_06_discussion-conclusion.Rmd'}
+```
+
+```{r include-results-written, child = '2_065_references.Rmd'}
+```
+
+##### page break
+
+```{r include-results-written, child = '2_07_tables-and-figures.Rmd'}
+```

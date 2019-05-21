@@ -1,0 +1,25 @@
+---
+title: "2_03_Introduction"
+author: "Corinne Riddell"
+date: "January 23, 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction
+
+Increasing seat belt use has been a key mechanism for improving the safety of motor vehicle drivers and passengers, and has contributed to a profound reduction in deaths from motor vehicle crashes in the United States.^1^ 
+Currently, seat belt use is nearly 90%, with 34 states and DC having primary enforcement of seat belt laws, and 15 states having secondary enforcement; only New Hampshire does not enforce seat belt use among adults.^2^ Under primary enforcement, a driver can be pulled over and ticketed for this violation if anyone in a front seat---or in any seat in some states---is not wearing a seat belt.^3^ Under secondary enforcement, failure to use a seat belt can only result in a charge after another traffic violation has been committed.3 As seat belt use has plateaued at high levels, there is evidence that recent policy upgrades from secondary to primary enforcement have had considerably weaker impacts on motor vehicle accident mortality.^4,5^  
+
+Despite their potential for reducing traffic crash deaths, there is concern that primary enforcement laws may lead to racial profiling,^6^ whereby minorities are at increased risk of interrogation, arrest, and search because of their perceived race and ethnicity.^7^ In this context, the ability to pull over drivers in the absence of a moving violation (e.g. speeding) may increase the likelihood of police harassment of minority drivers. Officers and state troopers may have lower thresholds for pulling over Black and Hispanic drivers compared to White drivers, without necessarily being conscious of bias. Moreover, under primary enforcement, observed violations of seat belt laws may be used to pull a driver over and then conduct a search or make an arrest that would not have occurred under secondary enforcement. At worst, such policies may endanger historically marginalized groups. The fatal police shooting of Philando Castile in Minnesota after he was pulled over for a broken tail light is one example of the potentially grave repercussions of minor traffic infractions that need to be considered when assessing the overall effects of these policies on health and discrimination.
+
+Previous studies examining discrimination in the enforcement of motor vehicle laws have found that Black drivers are stopped, ticketed, searched, and arrested more frequently than White drivers.^7-9^ The largest study found that Hispanic drivers were stopped less frequently than White drivers; however, once stopped, Hispanic drivers were more likely to be ticketed, searched, and arrested.^9^ 
+One the other hand, a report by the National Highway Traffic Safety Commission analyzed data from four U.S. states and found that the proportion of seat belt citations to minorities in the two years preceding primary enforcement was similar to the proportion after the policy change.^6^
+However the report did not examine whether the change differentially affected the number of stops, arrests, or searches to individuals of different races and ethnicities. 
+
+Evaluation of the impact of primary enforcement upgrades on discriminatory police practices has been hampered by the absence of comprehensive and reliable data on traffic stops by race/ethnicity. The recent publication of the Stanford Open Policing Project data provides a unique opportunity to evaluate more recent primary enforcement upgrades.^9^ 
+
+On December 9th, 2005, South Carolina upgraded its seat belt law from secondary to primary enforcement.^10^ The first objective of this study is to determine whether the change in enforcement led to a greater increase in the number of stops among Black and Hispanic drivers compared to White drivers. The second objective is to estimate how the change to seat belt policy affected search and arrest rates. We hypothesized that overall stops increased in the state after the change, and that the magnitude of the increase was higher for Black and Hispanic drivers. Given an expected increase in the number of stops, we hypothesized that the search and arrest rates would decrease overall after the policy change. We were interested in estimating whether the change in search and arrest rates varied by race and ethnicity, as differential impacts may indicate that stops for seat belt enforcement served as a premise for racially motivated arrests and/or searches.
+
+

@@ -1,0 +1,115 @@
+---
+title: "2_065_references"
+output:
+  word_document: default
+---
+
+## References
+
+1. Insurance Institute for Highway Safety, Highway Loss Data Institute. General 
+Statistics [Internet]. 2018 [cited March 11, 2019]. Available from:
+https://www.iihs.org/iihs/topics/t/general-statistics/fatalityfacts/overview-of-fatality-facts
+
+2. Insurance Institute for Highway Safety, Highway Loss Data Institute. Safety
+Belts [Internet]. 2019 [cited March 11, 2019]. Available from: 
+https://www.iihs.org/iihs/topics/laws/safetybeltuse/mapbeltenforcement 
+
+3. Goodwin, A., Thomas, L., Kirley, B., Hall, W., O’Brien, N., & Hill, K.
+Countermeasures that work: A highway safety countermeasure guide for State 
+highway safety offices, Eighth edition. (Report No. DOT HS 812 202) [Internet].
+2015 [cited March 11, 2019]. Available from: 
+https://www.nhtsa.gov/sites/nhtsa.dot.gov/files/documents/812202-countermeasuresthatwork8th.pdf
+
+4. Harper S, Strumpf EC. Primary enforcement of mandatory seat belt laws and 
+motor vehicle crash deaths. American Journal of Preventive Medicine. 
+2017;53(2):176-83.
+
+5. Harper S. Would Stronger Seat Belt Laws Reduce Motor Vehicle Crash Deaths? 
+A Semi-Bayesian Analysis. Epidemiology 2019;30(3):380–387.
+
+6. Tison J, Williams AF, Chaudhary NK, Nichols JL. (2011, September). 
+Determining the Relationship of Primary Seat Belt Laws to Minority Ticketing. 
+(Final Report. Report No. DOT HS 811 535). Washington, DC: National Highway 
+Traffic Safety Administration.
+
+7. The American Civil Liberties Union Racial Justice Program and The American
+Civil Liberties Union of Florida. Racial disparities in Florida safety belt law 
+enforcement. 2016 [cited March 11, 2019]. Available from: 
+https://www.aclu.org/report/racial-disparities-florida-safety-belt-law-enforcement
+
+8. Harris DA. The stories, the statistics, and the law: Why driving while Black
+matters. Minnesota Law Review. 1999; 84:265.
+
+9. Pierson E, Simoiu C, Overgoor J, Corbett-Davies S, Ramachandran V, Phillips 
+C, Goel S. A large-scale analysis of racial disparities in police stops across 
+the United States. arXiv preprint arXiv:1706.05678. 2017 Jun 18.
+
+10. South Carolina Department of Public Safety. SC Safety belt law [Internet]. 
+2019 [cited March 11, 2019]. Available from: 
+https://scdps.sc.gov/buckleupsc/safety_belt_law
+
+11. The Stanford Open Policing Project. Data. 2019 [cited March 11, 2019]. 
+Available from: https://openpolicing.stanford.edu/data/
+
+12. Harper S, Strumpf EC, Burris S, Smith GD, Lynch J. The effect of mandatory 
+seat belt laws on seat belt use by socioeconomic position. Journal of Policy 
+Analysis and Management. 2014;33(1):141–161.
+
+13. Zeileis A, Kleiber C, Jackman S. Regression models for count data in R. 
+[cited March 11, 2019]. Available from: 
+https://cran.r-project.org/web/packages/pscl/vignettes/countreg.pdf
+
+14. Ridgeway G, MacDonald JM. 2010. Methods for assessing racially biased 
+policing. In Race, Ethnicity, and Policing, ed. SK Rice, MD White, pp. 180–204. 
+New York: NYU Press.
+
+15. Muller CJ, MacLehose RJ. Estimating predicted probabilities from logistic 
+regression: different methods correspond to different target populations. 
+International Journal of Epidemiology. 2014;43(3):962-970.
+
+16. Cohen A, Einav L. The effects of mandatory seat belt laws on driving behavior
+and traffic fatalities. Review of Economics and Statistics. 2003;85(4):828-43.
+
+17. R Core Team (2018). R: A language and environment for statistical computing.
+R Foundation for Statistical Computing, Vienna, Austria. URL
+  https://www.R-project.org/.
+
+18. Berkeley Human Research Protection Program. What needs CPHS/OPHS Review 
+[Internet]. 2019 [cited March 11, 2019]. Available from:
+https://cphs.berkeley.edu/review.html
+
+19. Centers for Disease Control and Prevention, National Center for Chronic 
+Disease Prevention and Health Promotion, Division of Population Health. BRFSS 
+Prevalence & Trends Data [Internet]. 2015. [cited March 13, 2019]. 
+Available from: https://www.cdc.gov/brfss/brfssprevalence/.
+
+20. U.S. Immigration and Customs Enforcement. Delegation of Immigration 
+Authority Section 287(g) Immigration and Nationality Act [Internet]. 2018 
+[cited March 11, 2019]. Available from: https://www.ice.gov/287g
+
+21. Examining 287(G): The role of state and local law enforcement in immigration 
+law: hearing on S.111-3 before the Committee on homeland security house of 
+representatives, 111th Con., 3rd sess. (2009) 
+<!-- From: https://www.govinfo.gov/content/pkg/CHRG-111hhrg49374/html/CHRG-111hhrg49374.htm  -->
+
+22. Beaufort County Sheriff's Office. South Carolina proposal 287(g) program 
+[Internet]. 2008 [cited March 11, 2019]. Available from: http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=03288D84E6DA13EB1AE20E982462EA45?doi=10.1.1.174.192&rep=rep1&type=pdf
+
+23. South Carolina Department of Safety. Immigration Enforcement Unit. 2019 
+[cited March 11, 2019]. Available from: https://scdps.sc.gov/ieu
+
+24. Dinh-Zarr TB, Sleet DA, Shults RA, Zaza S, Elder RW, Nichols JL, Thompson RS,
+Sosin DM, Task Force on Community Preventive Services. Reviews of evidence 
+regarding interventions to increase the use of safety belts. American Journal 
+of Preventive Medicine. 2001;21(4):48-65.
+
+25. Seat Belt Use in 2017--Use Rates in the States and Territories [Internet]. 2018 [cited May 7, 2019]. Available from: https://crashstats.nhtsa.dot.gov/Api/Public/ViewPublication/812546 
+
+26. Rubin, J and Poston B. L.A. County deputies stopped thousands of innocent 
+Latinos on the 5 Freeway in hopes of their next drug bust. LA Times [newspaper 
+on the Internet]. 2018 Oct 4 [cited 2019 April 10]. Available from: 
+https://www.latimes.com/local/lanow/la-me-sheriff-latino-drug-stops-grapevine-20181004-htmlstory.html.
+
+27. Bailey ZD, Krieger N, Agénor M, Graves J, Linos N, Bassett MT. Structural
+racism and health inequities in the USA: evidence and interventions. The Lancet.
+2017;389(10077):1453-63.
