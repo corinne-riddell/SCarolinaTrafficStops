@@ -13,6 +13,6 @@ If you are unfamiliar with GitHub, but familiar with R and RStudio, you may wish
 
 To reproduce the working paper, use RStudio to "Knit" the manuscript file 2_Analysis-with-children.Rmd found in the Code folder. Alternatively, you can reproduce these data outputs yourself by following the steps in the "How to replicate these analyses" section.
 
-### Copyright
+### DOI
 
 The code has its own DOI that can be used to link to, and cite this work: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3066482.svg)](https://doi.org/10.5281/zenodo.3066482)
