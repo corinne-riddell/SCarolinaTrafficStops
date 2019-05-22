@@ -15,4 +15,4 @@ To reproduce the working paper, use RStudio to "Knit" the manuscript file 2_Anal
 
 ### Copyright
 
-The digital object identifier (DOI) for this repository is : [![DOI]()].
+The code has its own DOI that can be used to link to, and cite this work: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3066482.svg)](https://doi.org/10.5281/zenodo.3066482)
